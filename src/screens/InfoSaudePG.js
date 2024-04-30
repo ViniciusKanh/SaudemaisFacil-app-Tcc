@@ -1,3 +1,4 @@
+// InfoSaudePG.js
 import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
@@ -9,13 +10,12 @@ import {
   TextInput,
   Alert,
   TouchableOpacity,
-  Platform, 
+  Platform,
 } from "react-native";
 import { getAuth } from "firebase/auth";
 import { db } from "../config/firebaseConfig";
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
-import DateTimePicker from '@react-native-community/datetimepicker';
-
+import DateTimePicker from "@react-native-community/datetimepicker";
 
 const InfoSaudePG = () => {
   const [pressaoData, setPressaoData] = useState([]);
@@ -63,7 +63,9 @@ const InfoSaudePG = () => {
       orderBy("DataHora", "desc")
     );
     const querySnapshot = await getDocs(q);
-    setPressaoData(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    setPressaoData(
+      querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+    );
   };
 
   const fetchGlicemia = async () => {
@@ -75,7 +77,9 @@ const InfoSaudePG = () => {
       orderBy("Datetime", "desc")
     );
     const querySnapshot = await getDocs(q);
-    setGlicemiaData(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    setGlicemiaData(
+      querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+    );
   };
 
   const onChangeStartDate = (event, selectedDate) => {
@@ -96,7 +100,6 @@ const InfoSaudePG = () => {
     }
   };
 
-  
   const TableHeader = ({ headers }) => (
     <View style={styles.tableHeaderRow}>
       {headers.map((header, index) => (
@@ -142,7 +145,11 @@ const InfoSaudePG = () => {
 
   const calculateGlicemiaSummary = () => {
     if (!glicemiaData.length) {
-      return <Text style={styles.summaryText}>Carregando dados... ( Inserir data de inicial e Final)</Text>;
+      return (
+        <Text style={styles.summaryText}>
+          Carregando dados... ( Inserir data de inicial e Final)
+        </Text>
+      );
     }
 
     const totalGlicemia = glicemiaData.reduce(
@@ -203,7 +210,8 @@ const InfoSaudePG = () => {
   );
 
   const calculateSummary = () => {
-    if (!pressaoData.length) return "Carregando dados... ( Inserir data de inicial e Final)";
+    if (!pressaoData.length)
+      return "Carregando dados... ( Inserir data de inicial e Final)";
 
     const totalSistolica = pressaoData.reduce(
       (acc, curr) => acc + parseInt(curr.Sistolica, 10),
@@ -250,6 +258,15 @@ const InfoSaudePG = () => {
     <View style={styles.summarySection}>{calculateGlicemiaSummary()}</View>
   );
 
+  const Legend = () => (
+    <View style={styles.legendContainer}>
+      <View style={[styles.legendIndicator, { backgroundColor: "#ffcccc" }]} />
+      <Text style={styles.legendText}>Pressão/Glicemia Alta</Text>
+      <View style={[styles.legendIndicator, { backgroundColor: "#ccccff" }]} />
+      <Text style={styles.legendText}>Pressão/Glicemia Baixa</Text>
+    </View>
+  );
+
   return (
     <ScrollView style={styles.container} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
     <View style={styles.datePickerContainer}>
@@ -259,7 +276,10 @@ const InfoSaudePG = () => {
           value={startDate.toLocaleDateString()}
           editable={false}
         />
-        <TouchableOpacity style={styles.button} onPress={() => setShowStartDatePicker(true)}>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => setShowStartDatePicker(true)}
+        >
           <Text style={styles.buttonText}>Escolher Data Inicial</Text>
         </TouchableOpacity>
         {showStartDatePicker && (
@@ -278,7 +298,10 @@ const InfoSaudePG = () => {
           value={endDate.toLocaleDateString()}
           editable={false}
         />
-        <TouchableOpacity style={styles.button} onPress={() => setShowEndDatePicker(true)}>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => setShowEndDatePicker(true)}
+        >
           <Text style={styles.buttonText}>Escolher Data Final</Text>
         </TouchableOpacity>
         {showEndDatePicker && (
@@ -290,7 +313,10 @@ const InfoSaudePG = () => {
           />
         )}
       </View>
-    </View>
+      
+      </View>
+      <Legend />
+
       <View style={styles.section}>
         <Text style={styles.title}>Pressão Arterial - Últimos 30 dias</Text>
         {renderPressaoTable()}
@@ -367,52 +393,85 @@ const styles = StyleSheet.create({
     marginTop: 20, // Adjust this value as needed for top margin
   },
   datePickerWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 10
-  },
-  datePickerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 20,
-    marginBottom: 20, // Espaço antes do próximo conteúdo
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 10,
   },
   dateInputWrapper: {
-    flexDirection: 'column',
-    alignItems: 'center',
+    flexDirection: "column",
+    alignItems: "center",
     flex: 1,
   },
   dateInput: {
     fontSize: 16,
     padding: 10,
     borderBottomWidth: 2,
-    borderColor: '#007BFF', // Cor de destaque
+    borderColor: "#007BFF", // Cor de destaque
     marginBottom: 10, // Espaço antes do botão
-    color: '#333', // Cor do texto
-    backgroundColor: '#FFF', // Fundo branco para destacar
-    width: '100%',
-    textAlign: 'center', // Centraliza o texto
-    shadowColor: '#000', // Sombra para destaque
+    color: "#333", // Cor do texto
+    backgroundColor: "#FFF", // Fundo branco para destacar
+    width: "100%",
+    textAlign: "center", // Centraliza o texto
+    shadowColor: "#000", // Sombra para destaque
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2, // Elevação para sombra no Android
   },
   button: {
-    backgroundColor: '#007BFF', // Cor do botão
+    backgroundColor: "#007BFF", // Cor do botão
     padding: 12,
     borderRadius: 20,
-    shadowColor: '#000', // Sombra para destaque
+    shadowColor: "#000", // Sombra para destaque
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 2,
     elevation: 3, // Elevação para sombra no Android
   },
   buttonText: {
-    color: '#FFF', // Cor do texto do botão
+    color: "#FFF", // Cor do texto do botão
     fontSize: 16, // Tamanho do texto
-    fontWeight: 'bold', // Negrito para destaque
+    fontWeight: "bold", // Negrito para destaque
+  },
+  legendContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+    marginTop: 10,
+    marginBottom: 20,
+  },
+  legendIndicator: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    marginHorizontal: 10,
+  },
+  legendText: {
+    fontSize: 16,
+  },
+  datePickerContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: 20,
+    marginBottom: 20, // Espaço antes do próximo conteúdo
+  },
+  legendContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 10,
+    marginBottom: 40,
+  },
+  legendIndicator: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    marginHorizontal: 10,
+  },
+  legendText: {
+    fontSize: 16,
   },
 });
 

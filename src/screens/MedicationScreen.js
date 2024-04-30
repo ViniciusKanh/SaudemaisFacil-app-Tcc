@@ -41,7 +41,6 @@ const MedicationScreen = () => {
   const [typeConcentration, setTypeConcentration] = useState("");
   const [typeDosage, setTypeDosage] = useState("");
   const [typeMedicines, setTypeMedicines] = useState("");
-  const [qtt, setQtt] = useState("");
   const [typesConcentration, setTypesConcentration] = useState([]);
   const [typesDosage, setTypesDosage] = useState([]);
   const [typesMedicines, setTypesMedicines] = useState([]);
@@ -207,7 +206,6 @@ const MedicationScreen = () => {
       TypeConcentration: typeConcentration,
       TypeMedicines: typeMedicines,
       TypeDosage: typeDosage,
-      qtt: qtt,
       MedicationImage: imageUrl,
     };
 
@@ -235,7 +233,6 @@ const MedicationScreen = () => {
     setTypeConcentration("");
     setTypeMedicines("");
     setTypeDosage("");
-    setQtt("");
     alert("Medicamento cadastrado com sucesso.");
   };
 
@@ -277,7 +274,6 @@ const MedicationScreen = () => {
     setNomeMedicamento(medication.Nome_Medicamento);
     setTypeConcentration(medication.TypeConcentration);
     setTypeDosage(medication.TypeDosage);
-    setQtt(medication.qtt);
     setTypeMedicines(medication.TypeMedicines);
     setSelectedImage(medication.MedicationImage);
     setCurrentMedicationId(medication.id);
@@ -298,7 +294,6 @@ const MedicationScreen = () => {
     setTypeConcentration("");
     setTypeMedicines("");
     setTypeDosage("");
-    setQtt("");
     setCurrentMedicationId(""); // Limpa o ID do medicamento atual, se estiver editando
   };
 
@@ -343,9 +338,6 @@ const MedicationScreen = () => {
         <Text style={styles.cardText}>
           <Text style={styles.boldText}>Tipo de Dosagem:</Text>{" "}
           {item.TypeDosageLabel}
-        </Text>
-        <Text style={styles.cardText}>
-          <Text style={styles.boldText}>Quantidade:</Text> {item.qtt}
         </Text>
       </View>
       <View style={styles.iconContainer}>
@@ -459,15 +451,6 @@ const MedicationScreen = () => {
                 />
               ))}
             </Picker>
-
-            <Text style={styles.label}>Quantidade do Medicamento</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Quantidade"
-              keyboardType="numeric"
-              onChangeText={setQtt}
-              value={qtt.toString()}
-            />
             <View style={styles.imagePickerContainer}>
               {selectedImage && (
                 <Image

@@ -35,6 +35,10 @@ const DCNTScreen = ({ navigation }) => {
     setIsRelGlicemiaModalVisible(false);
   };
 
+  const navigateToInfoSaudePG = () => {
+    navigation.navigate('Histórico'); // Assumindo que o nome da rota é 'InfoSaudePG'
+  };
+
   return (
     <View style={styles.screenContainer}>
       <Text style={styles.title}>Pressão</Text>
@@ -64,8 +68,18 @@ const DCNTScreen = ({ navigation }) => {
         <TouchableOpacity style={styles.button} onPress={openRelGlicemiaModal}>
           <Text style={styles.buttonText}>Visualizar</Text>
         </TouchableOpacity>
+        
       </View>
+      <Text style={styles.title}>Historico</Text>
 
+      <View style={styles.historicoContainer}>
+  <TouchableOpacity
+    style={styles.button}
+    onPress={navigateToInfoSaudePG}
+  >
+    <Text style={styles.buttonText}>Histórico Personalizado</Text>
+  </TouchableOpacity>
+</View>
       <Modal
         animationType="slide"
         transparent={true}
@@ -152,6 +166,29 @@ const styles = StyleSheet.create({
     color: "#000",
     fontSize: 18,
     textAlign: "center", // Centraliza o texto no botão
+  },
+  navigateButton: {
+    backgroundColor: "#EDF3EF",
+    padding: 15,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#65BF85',
+    marginTop: 20,
+    width: "80%",
+  },
+  navigateButtonText: {
+    color: "#000",
+    fontSize: 18,
+    textAlign: "center",
+  },
+  historicoContainer: {
+    width: "80%",
+    padding: 20,
+    marginBottom: 20,
+    borderRadius: 10,
+    backgroundColor: "#EDF3EF",
+    borderWidth: 1,
+    borderColor: '#65BF85',
   },
 });
 export default DCNTScreen;

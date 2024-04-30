@@ -13,6 +13,7 @@ import {
 import { auth } from '../config/firebaseConfig';
 import Logo from "../components/Logo";
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import * as MediaLibrary from 'expo-media-library';
 
 
 const LoginScreen = ({ navigation }) => {
@@ -20,19 +21,25 @@ const LoginScreen = ({ navigation }) => {
   const [password, setPassword] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
 
-  const handleLogin = () => {
-    signInWithEmailAndPassword(auth, email, password)
-      .then((userCredential) => {
-        Alert.alert("Sucesso", "Login efetuado com sucesso");
+  const handleLogin = async () => {
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      // Solicitar permissões para a biblioteca de mídia
+      const permissionResponse = await MediaLibrary.requestPermissionsAsync();
+      if (permissionResponse.status === 'granted') {
         navigation.navigate("Menu");
-      })
-      .catch((error) => {
-        Alert.alert("Erro no login", error.message);
-      });
+      } else {
+        Alert.alert("Permissão negada", "Você não poderá salvar arquivos.");
+      }
+    } catch (error) {
+      Alert.alert("Erro no login", error.message);
+    }
   };
+
   const handleGoToRegister = () => {
     navigation.navigate("Register");
   };
+
 
   const handlePasswordReset = () => {
     sendPasswordResetEmail(auth, email)

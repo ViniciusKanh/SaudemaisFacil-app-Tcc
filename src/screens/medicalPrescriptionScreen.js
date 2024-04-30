@@ -10,6 +10,7 @@ import {
   Modal,
   StyleSheet,
   Alert,
+  ScrollView,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { db, storage } from "../config/firebaseConfig";
@@ -19,7 +20,8 @@ import * as ImagePicker from "expo-image-picker";
 import { getAuth } from "firebase/auth";
 import Icon from "react-native-vector-icons/FontAwesome";
 import * as LocalAuthentication from 'expo-local-authentication';
-
+import * as MediaLibrary from 'expo-media-library';
+import * as FileSystem from 'expo-file-system';
 
 // Componente da tela de prescrições médicas
 const MedicalPrescriptionScreen = () => {
@@ -221,20 +223,14 @@ const MedicalPrescriptionScreen = () => {
   // Renderiza cada item da lista de prescrições
   const renderPrescription = ({ item }) => (
     <View style={styles.prescriptionCard}>
-      <Text style={styles.cardText}>
-        <Text style={styles.boldText}>Medicamento:</Text> {item.Medicamento}
-      </Text>
-      <Text style={styles.cardText}>
-        <Text style={styles.boldText}>Tipo:</Text> {item.type}
-      </Text>
-      <Text style={styles.cardText}>
-        <Text style={styles.boldText}>Data:</Text>{" "}
-        {item.dateTime.toDate().toLocaleDateString()}
-      </Text>
-      {item.file && (
-        <Image source={{ uri: item.file }} style={styles.cardImage} />
-      )}
+      <Text style={styles.cardText}><Text style={styles.boldText}>Medicamento:</Text> {item.Medicamento}</Text>
+      <Text style={styles.cardText}><Text style={styles.boldText}>Tipo:</Text> {item.type}</Text>
+      <Text style={styles.cardText}><Text style={styles.boldText}>Data:</Text> {item.dateTime.toDate().toLocaleDateString()}</Text>
+      {item.file && <Image source={{ uri: item.file }} style={styles.cardImage} />}
       <View style={styles.iconContainer}>
+        <TouchableOpacity onPress={() => downloadFile(item.file, `Prescription_${item.id}.jpg`)}>
+          <Icon name="download" size={24} color="green" style={styles.icon} />
+        </TouchableOpacity>
         <TouchableOpacity onPress={() => editPrescription(item)}>
           <Icon name="edit" size={24} color="blue" style={styles.icon} />
         </TouchableOpacity>
@@ -274,109 +270,140 @@ const MedicalPrescriptionScreen = () => {
       // Ação após detecção de falta de suporte ou configuração, como voltar à tela anterior
     }
   };
-  // Renderização do componente
-  return (
-    <View style={styles.container}>
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() => setModalVisible(true)}
-      >
-        <Text style={styles.buttonText}>Cadastrar Receita</Text>
-      </TouchableOpacity>
 
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={onClose}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalView}>
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <Text style={styles.closeButtonText}>×</Text>
-            </TouchableOpacity>
-            <Text style={styles.LabelMedicamento}>
-              Titulo da Prescrição / Receita:
-            </Text>
-            <TextInput
-              style={styles.input}
-              onChangeText={setMedicamento}
-              value={medicamento}
-              placeholder="Um Resumo curto da Receita / Prescrição"
-            />
+// Função para baixar e salvar a imagem na galeria
+const downloadFile = async (uri, fileName) => {
+  try {
+    // Primeiro, pede a permissão para acessar a galeria
+    const { status } = await MediaLibrary.requestPermissionsAsync();
+    if (status !== 'granted') {
+      alert('Acesso à galeria não permitido!');
+      return;
+    }
 
-            <Text style={styles.label}>Categoria de Receita:</Text>
-            <Picker
-              selectedValue={tipoReceita}
-              onValueChange={(itemValue) => setTipoReceita(itemValue)}
-              style={styles.picker}
-            >
-              {typesPrescription.map((type) => (
-                <Picker.Item
-                  key={type.value}
-                  label={type.label}
-                  value={type.value}
-                />
-              ))}
-            </Picker>
-            <View style={{ height: 180 }} />
-            {/*
-            {selectedImage && (
-              <Image
-                source={{ uri: selectedImage }}
-                style={styles.previewImage}
-              />
-            )}
-            <View style={{ height: 80 }} />
-            */}
-            <TouchableOpacity style={styles.button} onPress={handleTakePhoto}>
-              <Text style={styles.buttonText}>Tirar Foto</Text>
-            </TouchableOpacity>
-            <View style={{ height: 80 }}>
-              <TouchableOpacity
-                style={styles.button}
-                onPress={handleChoosePhoto}
-              >
-                <Text style={styles.buttonText}>Escolher Foto</Text>
-              </TouchableOpacity>
+    // Baixa o arquivo para o sistema de arquivos local
+    const fileUri = FileSystem.documentDirectory + fileName;
+    const downloadResult = await FileSystem.downloadAsync(uri, fileUri);
 
-              <TouchableOpacity
-                style={[
-                  styles.button,
-                  { backgroundColor: selectedImage ? "#007bff" : "gray" },
-                ]}
-                onPress={handleUploadPrescription}
-                disabled={!selectedImage}
-              >
-                <Text style={styles.buttonText}>Salvar</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={{ height: 60 }} />
+    if (downloadResult.status === 200) {
+      // Salva o arquivo baixado na galeria do dispositivo
+      const asset = await MediaLibrary.createAssetAsync(downloadResult.uri);
+      await MediaLibrary.createAlbumAsync('Download', asset, false);
+      Alert.alert("Sucesso", "Arquivo baixado e salvo na galeria com sucesso!");
+    } else {
+      throw new Error('Falha no download do arquivo.');
+    }
+  } catch (error) {
+    Alert.alert("Erro", "Erro ao realizar o download: " + error.message);
+  }
+};
+
+// Componente da tela de prescrições médicas
+return (
+  <FlatList
+    data={prescriptions.sort((a, b) => new Date(b.dateTime.seconds * 1000) - new Date(a.dateTime.seconds * 1000))}
+    renderItem={renderPrescription}
+    keyExtractor={(item) => item.id.toString()}
+    ListHeaderComponent={(
+      <>
+        <TouchableOpacity style={styles.button} onPress={() => setModalVisible(true)}>
+          <Text style={styles.buttonText}>Cadastrar Receita</Text>
+        </TouchableOpacity>
+
+        {/* Legenda dos ícones */}
+        <View style={styles.legendContainer}>
+          <Text style={styles.legendTitle}>Legenda dos Ícones:</Text>
+          <View style={styles.legendItem}>
+            <Icon name="download" size={24} color="green" />
+            <Text style={styles.legendText}>Baixar Receita</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <Icon name="edit" size={24} color="blue" />
+            <Text style={styles.legendText}>Editar Receita</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <Icon name="trash" size={24} color="red" />
+            <Text style={styles.legendText}>Excluir Receita</Text>
           </View>
         </View>
-      </Modal>
 
-      {/* Lista de prescrições */}
-      <FlatList
-        data={prescriptions.sort((a, b) => {
-          // Sort by date from newest to oldest
-          return (
-            new Date(b.dateTime.seconds * 1000) -
-            new Date(a.dateTime.seconds * 1000)
-          );
-        })}
-        renderItem={renderPrescription}
-        keyExtractor={(item) => item.id.toString()}
-        style={{ width: "100%" }}
-      />
-    </View>
-  );
+        {/* Conteúdo do Modal */}
+   {/* Conteúdo do Modal */}
+   <Modal
+      animationType="slide"
+      transparent={true}
+      visible={modalVisible}
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalContainer}>
+        <View style={styles.modalView}>
+          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <Text style={styles.closeButtonText}>×</Text>
+          </TouchableOpacity>
+          <Text style={styles.LabelMedicamento}>
+            Título da Prescrição / Receita:
+          </Text>
+          <TextInput
+            style={styles.input}
+            onChangeText={setMedicamento}
+            value={medicamento}
+            placeholder="Um Resumo curto da Receita / Prescrição"
+          />
+          <Text style={styles.label}>Categoria de Receita:</Text>
+          <Picker
+            selectedValue={tipoReceita}
+            onValueChange={(itemValue) => setTipoReceita(itemValue)}
+            style={styles.picker}
+          >
+            {typesPrescription.map((type) => (
+              <Picker.Item
+                key={type.value}
+                label={type.label}
+                value={type.value}
+              />
+            ))}
+          </Picker>
+          <View style={{ height: 180 }} />
+          <TouchableOpacity style={styles.button} onPress={handleTakePhoto}>
+            <Text style={styles.buttonText}>Tirar Foto</Text>
+          </TouchableOpacity>
+          <View style={{ height: 80 }}>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={handleChoosePhoto}
+            >
+              <Text style={styles.buttonText}>Escolher Foto</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.button,
+                { backgroundColor: selectedImage ? "#007bff" : "gray" },
+              ]}
+              onPress={handleUploadPrescription}
+              disabled={!selectedImage}
+            >
+              <Text style={styles.buttonText}>Salvar</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={{ height: 60 }} />
+        </View>
+      </View>
+    </Modal>
+      </>
+    )}
+    style={{ width: "100%" }}
+  />
+);
+
 };
 const styles = StyleSheet.create({
-  container: {
+  scrollContainer: {
     flex: 1,
+  },
+  container: {
     justifyContent: "center",
     alignItems: "center",
+    padding: 20,
   },
   button: {
     backgroundColor: "#007bff",
@@ -513,6 +540,41 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 18,
     marginBottom: 20,
+  },
+  legendContainer: {
+    marginTop: 20,
+    padding: 20,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 10,
+    alignItems: 'center',
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 5
+    },
+    shadowOpacity: 0.23,
+    shadowRadius: 2.62,
+    elevation: 4,
+    width: "70%",
+    justifyContent: "space-around",
+    alignSelf: "flex-start",
+
+
+
+  },
+  legendTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 5,
+  },
+  legendText: {
+    marginLeft: 10,
+    fontSize: 16,
   },
 });
 
