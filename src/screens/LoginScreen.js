@@ -1,5 +1,5 @@
 // LoginScreen.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Alert,
@@ -9,37 +9,79 @@ import {
   StyleSheet,
   ScrollView,
   Modal,
-} from 'react-native';
-import { auth } from '../config/firebaseConfig';
+  Image,
+} from "react-native";
+import { auth } from "../config/firebaseConfig";
 import Logo from "../components/Logo";
-import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
-import * as MediaLibrary from 'expo-media-library';
-import * as Notifications from 'expo-notifications';
-import * as Permissions from 'expo-permissions'; // Se necessário, para versões do Expo SDK < 41
-
+import {
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+} from "firebase/auth";
+import * as MediaLibrary from "expo-media-library";
+import * as Notifications from "expo-notifications";
+import * as Permissions from "expo-permissions"; // Se necessário, para versões do Expo SDK < 41
+import * as Google from "expo-auth-session/providers/google";
+import { ResponseType } from "expo-auth-session";
+import { MaterialIcons } from "@expo/vector-icons";
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
+    clientId: "YOUR_CLIENT_ID",
+  });
+
+  useEffect(() => {
+    if (response?.type === "success") {
+      const { id_token } = response.params;
+
+      const credential = GoogleAuthProvider.credential(id_token);
+      signInWithCredential(auth, credential)
+        .then(() => {
+          // Navegar para a próxima tela após sucesso no login
+          navigation.navigate("Menu");
+        })
+        .catch((error) => {
+          // Lidar com erros aqui
+          Alert.alert("Erro no login", error.message);
+        });
+    }
+  }, [response]);
+
+  const handleGoogleLogin = () => {
+    promptAsync();
+  };
 
   const handleLogin = async () => {
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-  
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+
       // Solicitar permissões para mídia e notificações
-      const { status: mediaLibraryStatus } = await MediaLibrary.requestPermissionsAsync();
-      const { status: notificationsStatus } = await Notifications.requestPermissionsAsync({
-        ios: {
-          allowAlert: true,
-          allowBadge: true,
-          allowSound: true,
-          allowAnnouncements: true,
-        },
-      });
-  
-      if (mediaLibraryStatus !== 'granted' || notificationsStatus !== 'granted') {
-        Alert.alert("Permissão negada", "Algumas funcionalidades podem não estar disponíveis.");
+      const { status: mediaLibraryStatus } =
+        await MediaLibrary.requestPermissionsAsync();
+      const { status: notificationsStatus } =
+        await Notifications.requestPermissionsAsync({
+          ios: {
+            allowAlert: true,
+            allowBadge: true,
+            allowSound: true,
+            allowAnnouncements: true,
+          },
+        });
+
+      if (
+        mediaLibraryStatus !== "granted" ||
+        notificationsStatus !== "granted"
+      ) {
+        Alert.alert(
+          "Permissão negada",
+          "Algumas funcionalidades podem não estar disponíveis."
+        );
       } else {
         navigation.navigate("Menu");
       }
@@ -52,11 +94,13 @@ const LoginScreen = ({ navigation }) => {
     navigation.navigate("Register");
   };
 
-
   const handlePasswordReset = () => {
     sendPasswordResetEmail(auth, email)
       .then(() => {
-        Alert.alert("Redefinição de senha", "Instruções enviadas para o seu e-mail.");
+        Alert.alert(
+          "Redefinição de senha",
+          "Instruções enviadas para o seu e-mail."
+        );
         setModalVisible(false);
       })
       .catch((error) => {
@@ -82,9 +126,21 @@ const LoginScreen = ({ navigation }) => {
           onChangeText={setPassword}
           secureTextEntry={true}
         />
+
+        {/* Botão de Login com Google */}
+        <View style={styles.googleButtonContainer}>
+  <TouchableOpacity style={styles.googleButton} onPress={handleGoogleLogin}>
+    <View style={styles.iconContainer}>
+      <Image source={require("../assets/img/google.png")} style={styles.icon} />
+    </View>
+    <Text style={styles.buttonText}>Entrar com Google</Text>
+  </TouchableOpacity>
+</View>
+
+
         <View style={styles.buttonContainer}>
           <TouchableOpacity style={styles.button} onPress={handleLogin}>
-            <Text style={styles.buttonText}>     Entrar     </Text>
+            <Text style={styles.buttonText}>Entrar</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.button, styles.registerButton]}
@@ -93,6 +149,7 @@ const LoginScreen = ({ navigation }) => {
             <Text style={styles.buttonText}>Cadastre-se</Text>
           </TouchableOpacity>
         </View>
+
         <Text
           style={styles.forgotPasswordText}
           onPress={() => setModalVisible(true)}
@@ -119,10 +176,16 @@ const LoginScreen = ({ navigation }) => {
               keyboardType="email-address"
               autoCapitalize="none"
             />
-            <TouchableOpacity style={styles.button} onPress={handlePasswordReset}>
+            <TouchableOpacity
+              style={styles.button}
+              onPress={handlePasswordReset}
+            >
               <Text style={styles.buttonText}>Confirmar</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={() => setModalVisible(false)}>
+            <TouchableOpacity
+              style={[styles.button, styles.cancelButton]}
+              onPress={() => setModalVisible(false)}
+            >
               <Text style={styles.buttonText}>Cancelar</Text>
             </TouchableOpacity>
           </View>
@@ -135,16 +198,16 @@ const LoginScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   scroll: {
     flex: 1,
-    backgroundColor: "#f7f7f7", // Cor de fundo da tela
+    backgroundColor: "#f7f7f7",
     padding: 20,
   },
   container: {
     justifyContent: "center",
-    backgroundColor: '#f7f7f7',
+    backgroundColor: "#f7f7f7",
   },
   input: {
     height: 50,
-    width: '100%',
+    width: "100%",
     borderColor: "gray",
     borderWidth: 1,
     borderRadius: 5,
@@ -160,12 +223,40 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   registerButton: {
-    backgroundColor: "#4CAF50", // Botão "Cadastre-se" com fundo verde
+    backgroundColor: "#4CAF50",
   },
+  googleButtonContainer: {
+    marginBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  googleButton: {
+    flexDirection: 'row',
+    backgroundColor: '#DB4437', // Cor do Google
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 30,
+    alignItems: 'center',
+  },
+  
+  iconContainer: {
+    backgroundColor: 'white', // Círculo branco ao redor do ícone
+    borderRadius: 20,
+    padding: 10,
+    marginRight: 10,
+  },
+  
+  icon: {
+    width: 24,
+    height: 24,
+  },
+  
   buttonText: {
-    color: "white",
+    color: 'white',
     fontSize: 15,
-    fontWeight: "bold",
+    fontWeight: 'bold',
   },
   buttonContainer: {
     flexDirection: "row",
@@ -176,7 +267,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 20,
     fontSize: 20,
-
   },
   centeredView: {
     flex: 1,
@@ -193,23 +283,21 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 2
+      height: 2,
     },
     shadowOpacity: 0.25,
     shadowRadius: 4,
-    elevation: 5
+    elevation: 5,
   },
   modalTitle: {
     marginBottom: 20,
     textAlign: "center",
     fontWeight: "bold",
     fontSize: 20,
-    
   },
   cancelButton: {
-    backgroundColor: "#6c757d", // Cor cinza para o cancelar
+    backgroundColor: "#6c757d",
   },
-  
 });
 
 export default LoginScreen;

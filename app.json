@@ -5,11 +5,17 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "scheme": "saudemaisfacil", // Adicione esta linha
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/Splash.gif",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
+    },
+    "config": {
+      "googleSignIn": {
+        "reservedClientId": "com.googleusercontent.apps.YOUR_CLIENT_ID"
+      }
     },
     "assetBundlePatterns": [
       "**/*"

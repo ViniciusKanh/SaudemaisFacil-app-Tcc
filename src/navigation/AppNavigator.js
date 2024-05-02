@@ -40,6 +40,8 @@ import {
   updateDoc,
 } from "firebase/firestore";
 
+
+
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -79,7 +81,6 @@ export default function AppNavigator() {
     const auth = getAuth();
     const user = auth.currentUser;
     if (!user) {
-      console.log("No user logged in");
       return;
     }
 
@@ -107,7 +108,6 @@ export default function AppNavigator() {
     const auth = getAuth();
     const user = auth.currentUser;
     if (!user) {
-      console.error("No user logged in");
       return [];
     }
 
@@ -129,7 +129,6 @@ export default function AppNavigator() {
   useEffect(() => {
     const auth = getAuth();
     if (!auth.currentUser) {
-      console.log("No user logged in");
       return;
     }
 
