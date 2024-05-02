@@ -128,13 +128,14 @@ const InformationSaudeScreen = () => {
     navigation.navigate("Medicamentos");
   };
 
-  const handlePressLembretes = () => {
-    navigation.navigate("Lembretes");
-  };
-
   const handlePressDadosPessoais = () => {
     navigation.navigate("Dados Pessoais");
   };
+
+  const handlePressDuvidas = () => {
+    navigation.navigate("Duvidas");
+  };
+
 
   return (
     <ScrollView
@@ -197,6 +198,13 @@ const InformationSaudeScreen = () => {
         onPress={handlePressDadosPessoais}
       >
         <Text style={styles.buttonText}>Dados Pessoais</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.button}
+        onPress={handlePressDuvidas}
+      >
+        <Text style={styles.buttonText}>Perguntas/Duvidas</Text>
       </TouchableOpacity>
     </ScrollView>
   );

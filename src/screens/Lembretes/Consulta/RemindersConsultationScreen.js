@@ -18,8 +18,8 @@ import { db } from "../../../config/firebaseConfig";
 import { collection, addDoc, getDocs } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
-import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view'
-
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import * as Notifications from "expo-notifications";
 
 const initialState = {
   typeConsultation: { id: "", name: "" },
@@ -31,80 +31,60 @@ const initialState = {
   isDatePickerVisible: false,
   isTimePickerVisible: false,
   typeOptions: [],
+  keyboardPadding: 0,
 };
 
 const RemindersConsultationScreen = ({ isVisible, onClose }) => {
-  const [typeConsultation, setTypeConsultation] = useState(initialState.typeConsultation);
-  const [warningHours, setWarningHours] = useState(initialState.warningHours);
-  const [location, setLocation] = useState(initialState.location);
-  const [specialist, setSpecialist] = useState(initialState.specialist);
-  const [specialty, setSpecialty] = useState(initialState.specialty);
-  const [date, setDate] = useState(initialState.date);
-  const [isDatePickerVisible, setDatePickerVisibility] = useState(initialState.isDatePickerVisible);
-  const [isTimePickerVisible, setTimePickerVisibility] = useState(initialState.isTimePickerVisible);
-  const [typeOptions, setTypeOptions] = useState(initialState.typeOptions); // typeOptions inicializado corretamente.
-
-
+  const [state, setState] = useState(initialState);
   const auth = getAuth();
   const user = auth.currentUser;
 
-
   useEffect(() => {
     if (isVisible) {
-      const fetchTypeConsultation = async () => {
-        const querySnapshot = await getDocs(collection(db, "TypeConsultation"));
-        const fetchedTypes = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setTypeOptions(fetchedTypes);
-      };
       fetchTypeConsultation();
     }
-  
-    // Configuração dos listeners de teclado
-    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', _keyboardDidShow);
-    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', _keyboardDidHide);
-  
+    const keyboardDidShowListener = Keyboard.addListener(
+      "keyboardDidShow",
+      (e) => setState(prev => ({ ...prev, keyboardPadding: e.endCoordinates.height }))
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      "keyboardDidHide",
+      () => setState(prev => ({ ...prev, keyboardPadding: 0 }))
+    );
+
     return () => {
       keyboardDidShowListener.remove();
       keyboardDidHideListener.remove();
     };
   }, [isVisible]);
 
-  const [keyboardPadding, setKeyboardPadding] = useState(0);
+  useEffect(() => {
+    const subscription = Notifications.addNotificationReceivedListener(notification => {
+      console.log('Notificação recebida:', notification);
+    });
+  
+    return () => subscription.remove();
+  }, []);
 
-// As funções _keyboardDidShow e _keyboardDidHide
-const _keyboardDidShow = (e) => setKeyboardPadding(e.endCoordinates.height);
-const _keyboardDidHide = () => setKeyboardPadding(0);
-
-
-  const showDatePicker = () => {
-    setDatePickerVisibility(true);
+  const fetchTypeConsultation = async () => {
+    const querySnapshot = await getDocs(collection(db, "TypeConsultation"));
+    const fetchedTypes = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      name: doc.data().type, // Certifique-se de que 'name' é o campo correto no seu documento
+    }));
+    setState(prev => ({ ...prev, typeOptions: fetchedTypes }));
   };
-
-  const showTimePicker = () => {
-    // Only show time picker after a date has been set
-    if (date) {
-      setTimePickerVisibility(true);
-    } else {
-      alert("Por favor, escolha uma data primeiro.");
-    }
-  };
+  
 
   const handleConfirmDate = (selectedDate) => {
-    const currentDate = selectedDate || date;
-    setDate(currentDate);
-    setDatePickerVisibility(false);
+    const currentDate = selectedDate || state.date;
+    setState(prev => ({ ...prev, date: currentDate, isDatePickerVisible: false }));
   };
 
   const handleConfirmTime = (selectedTime) => {
-    const currentTime = selectedTime || new Date(date);
-    setDate(new Date(
-      date.getFullYear(),
-      date.getMonth(),
-      date.getDate(),
-      currentTime.getHours(),
-      currentTime.getMinutes()
-    ));
-    setTimePickerVisibility(false);
+    const newDate = new Date(state.date);
+    newDate.setHours(selectedTime.getHours(), selectedTime.getMinutes());
+    setState(prev => ({ ...prev, date: newDate, isTimePickerVisible: false }));
   };
 
   const handleSaveReminder = async () => {
@@ -112,99 +92,162 @@ const _keyboardDidHide = () => setKeyboardPadding(0);
       alert("Usuário não está logado.");
       return;
     }
-
-    const formattedDateTime = date.toISOString();
+  
+    const permission = await Notifications.getPermissionsAsync();
+    if (!permission.granted) {
+      alert("Permissão de notificação negada. O lembrete não poderá ser notificado.");
+      return;
+    }
+  
+    const formattedDateTime = state.date.toISOString();
     try {
       await addDoc(collection(db, "remindersConsultation"), {
         ID_user: user.uid,
-        Type: typeConsultation.id, // Salva o ID do tipo de consulta
-        TypeName: typeConsultation.name, // Salva o nome do tipo de consulta
+        Type: state.typeConsultation.id,
+        TypeName: state.typeConsultation.name,
         date_time: formattedDateTime,
-        location,
-        specialist,
-        specialty,
-        WarningHours: Number(warningHours),
-        Status: 0  // Define o status inicial como pendente
+        location: state.location,
+        specialist: state.specialist,
+        specialty: state.specialty,
+        WarningHours: Number(state.warningHours),
+        Status: 0,
       });
-      alert("Lembrete salvo com sucesso!");
-        // Agende a notificação
-    scheduleNotification(date.toISOString(), warningHours);
-    
-     // Sucesso no salvamento do lembrete
-      setTypeConsultation(initialState.typeConsultation);
-      setWarningHours(initialState.warningHours);
-      setLocation(initialState.location);
-      setSpecialist(initialState.specialist);
-      setSpecialty(initialState.specialty);
-      setDate(initialState.date);
-      setDatePickerVisibility(initialState.isDatePickerVisible);
-      setTimePickerVisibility(initialState.isTimePickerVisible);
-      
+  
+      // Notificação de teste imediato
+      const immediateNotification = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "Teste de Notificação",
+          body: "Seu sistema de notificações está funcionando!",
+          sound: true,
+        },
+        trigger: { seconds: 1 }, // Dispara imediatamente
+      });
+  
+      console.log('Notificação imediata agendada:', immediateNotification);
+  
+      // Calculando o horário da notificação agendada
+      const notificationTime = new Date(formattedDateTime);
+      notificationTime.setHours(notificationTime.getHours() - state.warningHours);
+  
+      if (notificationTime > new Date()) {
+        const scheduledNotification = await Notifications.scheduleNotificationAsync({
+          content: {
+            title: "Lembrete de Consulta",
+            body: `Sua consulta está agendada para ${formatDateDisplay(notificationTime)}`,
+            sound: true,
+          },
+          trigger: notificationTime,
+        });
+  
+        console.log('Notificação agendada:', scheduledNotification);
+        alert("Lembrete salvo e notificação agendada com sucesso!");
+      } else {
+        alert("A data e hora do lembrete já passaram, ajuste para um momento futuro.");
+      }
+  
+      resetForm(); // Função para resetar o formulário
       onClose(); // Fechando o modal após o salvamento
     } catch (error) {
       console.error("Erro ao salvar lembrete: ", error);
       alert("Erro ao salvar lembrete.");
     }
   };
-
-  // Função para formatar a data e hora selecionadas para visualização
-  const formatDateDisplay = () => {
-    return date.toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
+  
+  
+  
+  const resetForm = () => {
+    setState({
+      ...initialState,
+      date: new Date(), // Mantém a data atualizada
+      typeOptions: state.typeOptions, // Mantém as opções carregadas para tipo de consulta
+    });
+  };
+  
+  
+  const formatDateDisplay = (date) => {
+    return date.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
     });
   };
 
   return (
-    <Modal animationType="slide" transparent={true} visible={isVisible} onRequestClose={onClose}>
-<KeyboardAwareScrollView extraScrollHeight={20}>
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={isVisible}
+      onRequestClose={onClose}
+    >
+      <KeyboardAwareScrollView extraScrollHeight={20}>
         <View style={styles.modalView}>
-        <ScrollView contentContainerStyle={{ paddingBottom: keyboardPadding }}>
+          <ScrollView
+            contentContainerStyle={{ paddingBottom: state.keyboardPadding }}
+          >
             <Text style={styles.modalTitle}>Adicionar Novo Lembrete</Text>
             <Picker
-  selectedValue={typeConsultation.id}
-  onValueChange={(itemValue) => {
-    const selectedType = typeOptions.find(option => option.id === itemValue);
-    setTypeConsultation({ id: itemValue, name: selectedType ? selectedType.type : '' });
-  }}
-  style={styles.picker}
->
-  {typeOptions.map((option) => (
-    <Picker.Item key={option.id} label={option.type} value={option.id} />
-  ))}
-</Picker>
-            <Button title="Escolher Data" onPress={showDatePicker} />
-            <Button title="Escolher Hora" onPress={showTimePicker} />
-            <Text style={styles.dateDisplay}>{formatDateDisplay()}</Text>
+              selectedValue={state.typeConsultation.id}
+              onValueChange={(itemValue) => {
+                const selectedType = state.typeOptions.find(option => option.id === itemValue);
+                setState(prev => ({ ...prev, typeConsultation: { id: itemValue, name: selectedType.name } }));
+              }}
+              style={styles.picker}
+            >
+              {state.typeOptions.map((option) => (
+                <Picker.Item key={option.id} label={option.name} value={option.id} />
+              ))}
+            </Picker>
+            <Button title="Escolher Data" onPress={() => setState(prev => ({ ...prev, isDatePickerVisible: true }))} />
+            <Button title="Escolher Hora" onPress={() => setState(prev => ({ ...prev, isTimePickerVisible: true }))} />
+            <Text style={styles.dateDisplay}>
+              {formatDateDisplay(state.date)}
+            </Text>
             <DateTimePickerModal
-              isVisible={isDatePickerVisible}
+              isVisible={state.isDatePickerVisible}
               mode="date"
               onConfirm={handleConfirmDate}
-              onCancel={() => setDatePickerVisibility(false)}
-              date={date}
+              onCancel={() => setState(prev => ({ ...prev, isDatePickerVisible: false }))}
+              date={state.date}
             />
             <DateTimePickerModal
-              isVisible={isTimePickerVisible}
+              isVisible={state.isTimePickerVisible}
               mode="time"
               onConfirm={handleConfirmTime}
-              onCancel={() => setTimePickerVisibility(false)}
-              date={date}
+              onCancel={() => setState(prev => ({ ...prev, isTimePickerVisible: false }))}
+              date={state.date}
             />
             <TextInput
               placeholder="Horas de aviso"
-              value={warningHours.toString()}
-              onChangeText={(text) => setWarningHours(Number(text))}
+              value={state.warningHours.toString()}
+              onChangeText={(text) => setState(prev => ({ ...prev, warningHours: Number(text) }))}
               style={styles.input}
               keyboardType="numeric"
             />
-            <TextInput placeholder="Local" value={location} onChangeText={setLocation} style={styles.input} />
-            <TextInput placeholder="Especialista" value={specialist} onChangeText={setSpecialist} style={styles.input} />
-            <TextInput placeholder="Especialidade" value={specialty} onChangeText={setSpecialty} style={styles.input} />
-            <TouchableOpacity style={styles.buttonSalvar} onPress={handleSaveReminder}>
+            <TextInput
+              placeholder="Local"
+              value={state.location}
+              onChangeText={(text) => setState(prev => ({ ...prev, location: text }))}
+              style={styles.input}
+            />
+            <TextInput
+              placeholder="Especialista"
+              value={state.specialist}
+              onChangeText={(text) => setState(prev => ({ ...prev, specialist: text }))}
+              style={styles.input}
+            />
+            <TextInput
+              placeholder="Especialidade"
+              value={state.specialty}
+              onChangeText={(text) => setState(prev => ({ ...prev, specialty: text }))}
+              style={styles.input}
+            />
+            <TouchableOpacity
+              style={styles.buttonSalvar}
+              onPress={handleSaveReminder}
+            >
               <Text style={styles.buttonTextSalvar}>Salvar</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.buttonClose} onPress={onClose}>
@@ -212,32 +255,31 @@ const _keyboardDidHide = () => setKeyboardPadding(0);
             </TouchableOpacity>
           </ScrollView>
         </View>
-        </KeyboardAwareScrollView>
-      </Modal>
-        );
+      </KeyboardAwareScrollView>
+    </Modal>
+  );
 };
-
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
   },
   dateDisplay: {
     fontSize: 16,
-    color: '#333',
+    color: "#333",
     marginTop: 20,
   },
   button: {
-    backgroundColor: '#007bff',
+    backgroundColor: "#007bff",
     padding: 10,
     borderRadius: 5,
     marginTop: 20,
   },
   buttonText: {
-    color: 'white',
+    color: "white",
   },
   modalView: {
     margin: 26,

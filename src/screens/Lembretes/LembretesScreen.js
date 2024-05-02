@@ -1,19 +1,34 @@
 // LembreteScreen.js
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Alert } from 'react-native';
 import RemindersConsultationScreen from './Consulta/RemindersConsultationScreen';
+import * as Notifications from 'expo-notifications';
 
 const LembretesScreen = ({ navigation }) => {
   const [isModalVisible, setModalVisible] = useState(false);
 
-  // Funções para abrir e fechar o modal
   const openModal = () => setModalVisible(true);
   const closeModal = () => setModalVisible(false);
+  const navigateToRelReminders = () => {
+    navigation.navigate('Consultas');
+  };
 
-    // Função para navegar para a tela de visualização
-    const navigateToRelReminders = () => {
-      navigation.navigate('Consultas');
-    };
+  const sendTestNotification = async () => {
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "Teste Direto",
+          body: "Esta é uma notificação de teste direto.",
+          sound: true,
+        },
+        trigger: { seconds: 2 }, // Dispara imediatamente
+      });
+      Alert.alert("Notificação Teste", "Notificação de teste agendada!");
+    } catch (error) {
+      Alert.alert("Erro", "Falha ao agendar a notificação de teste!");
+      console.error(error);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -35,6 +50,9 @@ const LembretesScreen = ({ navigation }) => {
           </TouchableOpacity>
           <TouchableOpacity style={styles.button} onPress={navigateToRelReminders}>
             <Text style={styles.buttonText}>Visualizar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.button} onPress={sendTestNotification}>
+            <Text style={styles.buttonText}>Testar Notificação</Text>
           </TouchableOpacity>
         </View>
       </View>

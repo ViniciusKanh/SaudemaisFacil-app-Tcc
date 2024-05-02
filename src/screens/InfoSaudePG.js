@@ -10,12 +10,17 @@ import {
   TextInput,
   Alert,
   TouchableOpacity,
-  Platform,
+  Platform, 
 } from "react-native";
 import { getAuth } from "firebase/auth";
 import { db } from "../config/firebaseConfig";
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
-import DateTimePicker from "@react-native-community/datetimepicker";
+import DateTimePicker from '@react-native-community/datetimepicker';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import XLSX from 'xlsx';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+
 
 const InfoSaudePG = () => {
   const [pressaoData, setPressaoData] = useState([]);
@@ -63,9 +68,7 @@ const InfoSaudePG = () => {
       orderBy("DataHora", "desc")
     );
     const querySnapshot = await getDocs(q);
-    setPressaoData(
-      querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
-    );
+    setPressaoData(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
   };
 
   const fetchGlicemia = async () => {
@@ -77,9 +80,7 @@ const InfoSaudePG = () => {
       orderBy("Datetime", "desc")
     );
     const querySnapshot = await getDocs(q);
-    setGlicemiaData(
-      querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
-    );
+    setGlicemiaData(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
   };
 
   const onChangeStartDate = (event, selectedDate) => {
@@ -100,12 +101,42 @@ const InfoSaudePG = () => {
     }
   };
 
+  const exportToExcel = async () => {
+    const wb = XLSX.utils.book_new();
+    const ws1 = XLSX.utils.json_to_sheet(pressaoData.map(data => ({
+      "Data/Hora": new Date(data.DataHora.seconds * 1000).toLocaleString(),
+      "Pressão Alta/Baixa": `${data.Sistolica}/${data.Diastolica}`,
+      "Humor": data.Humor,
+      "Tontura/Dor": data.Tontura ? "Sim" : "Não",
+    })));
+    const ws2 = XLSX.utils.json_to_sheet(glicemiaData.map(data => ({
+      "Data e Hora": new Date(data.Datetime.seconds * 1000).toLocaleString(),
+      "Glicemia": data.Glicemia,
+      "Em Jejum": data.Infasting ? "Sim" : "Não",
+      "Humor": data.Humor,
+    })));
+  
+    XLSX.utils.book_append_sheet(wb, ws1, "Pressão Arterial");
+    XLSX.utils.book_append_sheet(wb, ws2, "Glicemia");
+  
+    const wbout = XLSX.write(wb, { type: 'base64', bookType: "xlsx" });
+    const uri = `${FileSystem.cacheDirectory}dadosSaude.xlsx`;
+    await FileSystem.writeAsStringAsync(uri, wbout, { encoding: FileSystem.EncodingType.Base64 });
+  
+    try {
+      await Sharing.shareAsync(uri, { mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', dialogTitle: 'Compartilhar dados de saúde' });
+      Alert.alert('Exportação concluída', 'Arquivo Excel foi compartilhado com sucesso.');
+    } catch (error) {
+      console.error('Erro ao compartilhar o arquivo:', error);
+      Alert.alert('Erro de Exportação', 'Não foi possível compartilhar o arquivo.');
+    }
+  };
+  
+  
   const TableHeader = ({ headers }) => (
     <View style={styles.tableHeaderRow}>
       {headers.map((header, index) => (
-        <Text key={index} style={styles.tableHeaderCell}>
-          {header}
-        </Text>
+        <Text key={index} style={styles.tableHeaderCell}>{header}</Text>
       ))}
     </View>
   );
@@ -119,22 +150,20 @@ const InfoSaudePG = () => {
         const sistolica = parseInt(item.Sistolica, 10);
         const diastolica = parseInt(item.Diastolica, 10);
         let backgroundColor = "#fff"; // Cor padrão
-
+  
         // Altera a cor de fundo se a pressão estiver alta ou baixa
         if (sistolica > 140 || diastolica > 90) {
           backgroundColor = "#ffcccc"; // Vermelho claro para pressão alta
         } else if (sistolica < 110 || diastolica < 60) {
           backgroundColor = "#ccccff"; // Azul claro para pressão baixa
         }
-
+  
         return (
           <View key={index} style={[styles.tableRow, { backgroundColor }]}>
             <Text style={styles.tableCell}>
               {new Date(item.DataHora.seconds * 1000).toLocaleString()}
             </Text>
-            <Text
-              style={styles.tableCell}
-            >{`${item.Sistolica}/${item.Diastolica}`}</Text>
+            <Text style={styles.tableCell}>{`${item.Sistolica}/${item.Diastolica}`}</Text>
             <Text style={styles.tableCell}>{item.Humor}</Text>
             <Text style={styles.tableCell}>{item.Tontura ? "Sim" : "Não"}</Text>
           </View>
@@ -142,14 +171,10 @@ const InfoSaudePG = () => {
       })}
     </View>
   );
-
+  
   const calculateGlicemiaSummary = () => {
     if (!glicemiaData.length) {
-      return (
-        <Text style={styles.summaryText}>
-          Carregando dados... ( Inserir data de inicial e Final)
-        </Text>
-      );
+      return <Text style={styles.summaryText}>Carregando dados... ( Inserir data de inicial e Final)</Text>;
     }
 
     const totalGlicemia = glicemiaData.reduce(
@@ -186,13 +211,13 @@ const InfoSaudePG = () => {
       <TableHeader headers={["Data e Hora", "Glicemia", "Em Jejum", "Humor"]} />
       {glicemiaData.map((item, index) => {
         let backgroundColor = "#fff"; // Cor padrão para linhas normais
-
+  
         if (item.Glicemia > 100) {
           backgroundColor = "#ffcccc"; // Vermelho claro para glicemia alta
         } else if (item.Glicemia < 70) {
           backgroundColor = "#ccccff"; // Azul claro para glicemia baixa
         }
-
+  
         return (
           <View key={index} style={[styles.tableRow, { backgroundColor }]}>
             <Text style={styles.tableCell}>
@@ -208,115 +233,103 @@ const InfoSaudePG = () => {
       })}
     </View>
   );
-
   const calculateSummary = () => {
-    if (!pressaoData.length)
-      return "Carregando dados... ( Inserir data de inicial e Final)";
-
-    const totalSistolica = pressaoData.reduce(
-      (acc, curr) => acc + parseInt(curr.Sistolica, 10),
-      0
-    );
-    const totalDiastolica = pressaoData.reduce(
-      (acc, curr) => acc + parseInt(curr.Diastolica, 10),
-      0
-    );
+    if (!pressaoData.length) {
+      return (
+        <Text style={styles.summaryText}>Carregando dados... (Inserir data de inicial e Final)</Text>
+      );
+    }
+  
+    const totalSistolica = pressaoData.reduce((acc, curr) => acc + parseInt(curr.Sistolica, 10), 0);
+    const totalDiastolica = pressaoData.reduce((acc, curr) => acc + parseInt(curr.Diastolica, 10), 0);
     const averageSistolica = totalSistolica / pressaoData.length;
     const averageDiastolica = totalDiastolica / pressaoData.length;
-
+  
     const humorCounts = pressaoData.reduce((acc, curr) => {
       acc[curr.Humor] = (acc[curr.Humor] || 0) + 1;
       return acc;
     }, {});
     const mostFrequentHumor = Object.keys(humorCounts).reduce(
-      (a, b) => (humorCounts[a] > humorCounts[b] ? a : b),
-      ""
+      (a, b) => (humorCounts[a] > humorCounts[b] ? a : b), ""
     );
-
+  
     const tonturaDias = pressaoData.filter((item) => item.Tontura).length;
-
+  
     return (
       <Text style={styles.summaryText}>
         O usuário teve uma média de pressão{" "}
         <Text style={styles.boldText}>
           {averageSistolica.toFixed(1)}/{averageDiastolica.toFixed(1)}
-        </Text>{" "}
-        nesses 30 dias, seus humores variaram, porém ele ficou mais{" "}
-        <Text style={styles.boldText}>{mostFrequentHumor}</Text> e teve{" "}
-        <Text style={styles.boldText}>{tonturaDias}</Text> dias de dor e
-        tontura.
+        </Text>
+        {" "}nesses 30 dias, seus humores variaram, porém ele ficou mais{" "}
+        <Text style={styles.boldText}>{mostFrequentHumor}</Text>{" "}e teve{" "}
+        <Text style={styles.boldText}>{tonturaDias}</Text>{" "}dias de dor e tontura.
       </Text>
     );
   };
-
+  
   const SummarySection = () => (
     <View style={styles.summarySection}>
-      <Text style={styles.summaryText}>{calculateSummary()}</Text>
+      {calculateSummary()}
     </View>
   );
+
   const GlicemiaSummarySection = () => (
-    <View style={styles.summarySection}>{calculateGlicemiaSummary()}</View>
-  );
-
-  const Legend = () => (
-    <View style={styles.legendContainer}>
-      <View style={[styles.legendIndicator, { backgroundColor: "#ffcccc" }]} />
-      <Text style={styles.legendText}>Pressão/Glicemia Alta</Text>
-      <View style={[styles.legendIndicator, { backgroundColor: "#ccccff" }]} />
-      <Text style={styles.legendText}>Pressão/Glicemia Baixa</Text>
+    <View style={styles.summarySection}>
+      {calculateGlicemiaSummary()}
     </View>
   );
-
-  return (
-    <ScrollView style={styles.container} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+  const renderDatePickers = () => (
     <View style={styles.datePickerContainer}>
       <View style={styles.dateInputWrapper}>
-        <TextInput
-          style={styles.dateInput}
-          value={startDate.toLocaleDateString()}
-          editable={false}
-        />
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => setShowStartDatePicker(true)}
-        >
+        <TextInput style={styles.dateInput} value={startDate.toLocaleDateString()} editable={false} />
+        <TouchableOpacity style={styles.button} onPress={() => setShowStartDatePicker(true)}>
           <Text style={styles.buttonText}>Escolher Data Inicial</Text>
         </TouchableOpacity>
         {showStartDatePicker && (
-          <DateTimePicker
-            value={startDate}
-            mode="date"
-            display="default"
-            onChange={onChangeStartDate}
-          />
+          <DateTimePicker value={startDate} mode="date" display="default" onChange={onChangeStartDate} />
         )}
       </View>
-
       <View style={styles.dateInputWrapper}>
-        <TextInput
-          style={styles.dateInput}
-          value={endDate.toLocaleDateString()}
-          editable={false}
-        />
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => setShowEndDatePicker(true)}
-        >
+        <TextInput style={styles.dateInput} value={endDate.toLocaleDateString()} editable={false} />
+        <TouchableOpacity style={styles.button} onPress={() => setShowEndDatePicker(true)}>
           <Text style={styles.buttonText}>Escolher Data Final</Text>
         </TouchableOpacity>
         {showEndDatePicker && (
-          <DateTimePicker
-            value={endDate}
-            mode="date"
-            display="default"
-            onChange={onChangeEndDate}
-          />
+          <DateTimePicker value={endDate} mode="date" display="default" onChange={onChangeEndDate} />
         )}
       </View>
-      
-      </View>
-      <Legend />
+    </View>
+  );
 
+  const renderExportButton = () => (
+    <TouchableOpacity style={styles.exportButton} onPress={exportToExcel}>
+      <MaterialCommunityIcons name="microsoft-excel" size={24} color="white" />
+      <Text style={styles.exportButtonText}>Exportar para Excel</Text>
+    </TouchableOpacity>
+  );
+
+  const ColorLegend = () => (
+    <View style={styles.legendContainer}>
+      <Text style={styles.legendTitle}>Legenda de Cores:</Text>
+      <View style={styles.legendItem}>
+        <View style={[styles.colorBox, { backgroundColor: '#ffcccc' }]} />
+        <Text style={styles.legendText}>Pressão Alta</Text>
+      </View>
+      <View style={styles.legendItem}>
+        <View style={[styles.colorBox, { backgroundColor: '#ccccff' }]} />
+        <Text style={styles.legendText}>Pressão Baixa</Text>
+      </View>
+    </View>
+  );
+
+
+  return (
+    <ScrollView style={styles.container} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+      <Text style={styles.pageTitle}>Monitoramento de Saúde</Text>
+      {renderDatePickers()}
+      {renderExportButton()}
+      {ColorLegend()}
       <View style={styles.section}>
         <Text style={styles.title}>Pressão Arterial - Últimos 30 dias</Text>
         {renderPressaoTable()}
@@ -332,9 +345,12 @@ const InfoSaudePG = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  legendContainer: {
+    backgroundColor: '#e8e8e8',
+    borderRadius: 10,
     padding: 10,
+    alignItems: 'center',
+    marginBottom: 10, // Ensure separation from other elements
   },
   section: {
     marginBottom: 20,
@@ -393,86 +409,90 @@ const styles = StyleSheet.create({
     marginTop: 20, // Adjust this value as needed for top margin
   },
   datePickerWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 10
+  },
+  container: {
+    flex: 1,
     padding: 10,
   },
+  datePickerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
   dateInputWrapper: {
-    flexDirection: "column",
-    alignItems: "center",
-    flex: 1,
+    width: '50%',
+    paddingRight: 5,
   },
   dateInput: {
     fontSize: 16,
     padding: 10,
     borderBottomWidth: 2,
-    borderColor: "#007BFF", // Cor de destaque
-    marginBottom: 10, // Espaço antes do botão
-    color: "#333", // Cor do texto
-    backgroundColor: "#FFF", // Fundo branco para destacar
-    width: "100%",
-    textAlign: "center", // Centraliza o texto
-    shadowColor: "#000", // Sombra para destaque
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2, // Elevação para sombra no Android
+    borderColor: '#007BFF',
+    backgroundColor: '#FFF',
+    textAlign: 'center',
+    marginBottom: 5,
   },
   button: {
-    backgroundColor: "#007BFF", // Cor do botão
+    backgroundColor: '#007BFF',
     padding: 12,
     borderRadius: 20,
-    shadowColor: "#000", // Sombra para destaque
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 3, // Elevação para sombra no Android
+    alignItems: 'center',
   },
   buttonText: {
-    color: "#FFF", // Cor do texto do botão
-    fontSize: 16, // Tamanho do texto
-    fontWeight: "bold", // Negrito para destaque
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  exportButton: {
+    backgroundColor: '#007BFF',
+    padding: 15,
+    borderRadius: 25,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  exportButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginLeft: 10,
   },
   legendContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: '#e8e8e8',
+    borderRadius: 10,
     padding: 10,
-    marginTop: 10,
-    marginBottom: 20,
-  },
-  legendIndicator: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    marginHorizontal: 10,
-  },
-  legendText: {
-    fontSize: 16,
-  },
-  datePickerContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 20,
-    marginBottom: 20, // Espaço antes do próximo conteúdo
-  },
-  legendContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 40,
+    marginBottom: 10,
   },
-  legendIndicator: {
+  legendTitle: {
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginBottom: 5,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 5,
+  },
+  colorBox: {
     width: 20,
     height: 20,
-    borderRadius: 10,
-    marginHorizontal: 10,
+    marginRight: 10,
   },
   legendText: {
-    fontSize: 16,
+    fontSize: 14,
+  },
+  pageTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    textAlign: 'center',
   },
 });
 
-export default InfoSaudePG;
+export default InfoSaudePG;

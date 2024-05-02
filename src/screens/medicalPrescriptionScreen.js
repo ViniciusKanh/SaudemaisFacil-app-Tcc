@@ -1,5 +1,5 @@
 //medicalPrescriptionScreen.js
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect,useRef  } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,8 @@ import {
   StyleSheet,
   Alert,
   ScrollView,
+  RefreshControl,
+  Animated,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { db, storage } from "../config/firebaseConfig";
@@ -22,6 +24,8 @@ import Icon from "react-native-vector-icons/FontAwesome";
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
+import { useNavigation } from '@react-navigation/native';
+
 
 // Componente da tela de prescrições médicas
 const MedicalPrescriptionScreen = () => {
@@ -33,54 +37,102 @@ const MedicalPrescriptionScreen = () => {
   const [tipoReceita, setTipoReceita] = useState("");
   const [typesPrescription, setTypesPrescription] = useState([]);
   const [currentPrescriptionId, setCurrentPrescriptionId] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const navigation = useNavigation();
+  const [refreshing, setRefreshing] = useState(false); // Estado para controlar o refresh
+  const animation = useRef(new Animated.Value(0)).current;
+
+
 
   // Efeito para buscar os tipos de receita e as prescrições
   useEffect(() => {
-    const fetchTypesPrescription = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, "TypePrescription"));
-        const fetchedTypes = querySnapshot.docs.map(doc => ({
-          label: doc.data().Type,
-          value: doc.id
-        }));
-        setTypesPrescription(fetchedTypes);
-      } catch (error) {
-        console.error("Erro ao buscar tipos de prescrição:", error);
-        Alert.alert("Erro", "Não foi possível buscar os tipos de prescrição.");
-      }
-    };
-  
-    const auth = getAuth();
-    const unsubscribe = auth.onAuthStateChanged(user => {
-      if (user) {
-        fetchPrescriptions(user.uid); // Passa o UID diretamente para a função de buscar prescrições
-      } else {
-        setPrescriptions([]); // Limpa as prescrições se não houver usuário logado
-      }
-    });
-  
     fetchTypesPrescription();
-    promptForBiometricAuthentication();
-  
-    return () => unsubscribe(); // Limpa o observador de estado de autenticação quando o componente é desmontado
+    authenticate();
   }, []);
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(animation, { toValue: 1.2, duration: 500, useNativeDriver: true }),
+        Animated.timing(animation, { toValue: 1, duration: 500, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+
+  const onRefresh = () => {
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (user) {
+      fetchPrescriptions(user.uid);
+    }
+  };
   
+
+  const authenticate = async () => {
+    const hasHardware = await LocalAuthentication.hasHardwareAsync();
+    const isBiometricSupported = await LocalAuthentication.isEnrolledAsync();
+    const auth = getAuth();
+
+    if (hasHardware && isBiometricSupported) {
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: "Autenticação necessária",
+        fallbackLabel: "Digite a senha do dispositivo",
+        disableDeviceFallback: false,
+      });
+
+      if (result.success) {
+        setIsAuthenticated(true);
+        fetchPrescriptions(auth.currentUser?.uid);
+      } else {
+        Alert.alert("Autenticação", "Autenticação falhou ou foi cancelada.");
+      }
+    } else {
+      Alert.alert("Autenticação", "Dispositivo não suporta autenticação biométrica.");
+    }
+  };
+
+  const fetchTypesPrescription = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "TypePrescription"));
+      const fetchedTypes = querySnapshot.docs.map(doc => ({
+        label: doc.data().Type,
+        value: doc.id
+      }));
+      setTypesPrescription(fetchedTypes);
+    } catch (error) {
+      console.error("Erro ao buscar tipos de prescrição:", error);
+      Alert.alert("Erro", "Não foi possível buscar os tipos de prescrição.");
+    }
+  };
+
   const fetchPrescriptions = async (userID) => {
+    if (!userID) return;
+    setRefreshing(true);
     try {
       const presQuery = query(collection(db, "medicalPrescription"), where("ID_users", "==", userID));
       const querySnapshot = await getDocs(presQuery);
-      const prescriptionsList = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setPrescriptions(prescriptionsList);
+      setPrescriptions(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     } catch (error) {
       console.error("Erro ao buscar prescrições médicas:", error);
       Alert.alert("Erro", "Não foi possível buscar as prescrições médicas.");
     }
+    setRefreshing(false);
   };
-  
-  
+
+  if (!isAuthenticated) {
+    return (
+      <View style={styles.centered}>
+        <Animated.Text style={[styles.authText, { transform: [{ scale: animation }] }]}>
+          A autenticação é necessária para acessar esta tela.
+        </Animated.Text>
+        <TouchableOpacity style={styles.button} onPress={authenticate}>
+          <Text style={styles.buttonText}>Tentar Novamente</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+
   // Função para fechar o modal
   const onClose = () => {
     setModalVisible(false);
@@ -185,7 +237,7 @@ const MedicalPrescriptionScreen = () => {
       setSelectedImage(null); // Limpar a imagem selecionada
       setMedicamento(""); // Limpa o campo de medicamento
       setTipoReceita(""); // Reseta a seleção do tipo de receita
-      fetchPrescriptions(); // Recarrega as prescrições
+      fetchPrescriptions(userID); // Atualiza a lista após salvar uma nova prescrição
       alert("Prescrição salva com sucesso.");
     } catch (error) {
       console.error("Erro ao salvar prescrição: ", error);
@@ -241,36 +293,6 @@ const MedicalPrescriptionScreen = () => {
     </View>
   );
 
-  const promptForBiometricAuthentication = async () => {
-    const compatible = await LocalAuthentication.hasHardwareAsync();
-    const savedBiometrics = await LocalAuthentication.isEnrolledAsync();
-    
-    if (compatible && savedBiometrics) {
-      try {
-        const result = await LocalAuthentication.authenticateAsync({
-          promptMessage: 'Autenticação necessária',
-          cancelLabel: 'Cancelar', // Deve ser uma string, não um booleano
-          fallbackLabel: 'Use sua senha',
-        });
-  
-        if (result.success) {
-          // Autenticação bem-sucedida, continue a execução normalmente
-        } else {
-          // Autenticação falhou ou foi cancelada
-          Alert.alert('Autenticação necessária', 'Autenticação via Face ID falhou ou foi cancelada. Você não pode acessar esta área sem autenticação.');
-          // Ação após falha, como voltar à tela anterior
-        }
-      } catch (error) {
-        // Tratamento de erro da tentativa de autenticação
-        Alert.alert('Erro de autenticação', 'Ocorreu um erro durante a autenticação. Por favor, tente novamente.');
-      }
-    } else {
-      // Hardware não compatível ou sem biometria configurada
-      Alert.alert('Sem suporte a Face ID', 'Seu dispositivo não suporta ou não tem Face ID configurado.');
-      // Ação após detecção de falta de suporte ou configuração, como voltar à tela anterior
-    }
-  };
-
 // Função para baixar e salvar a imagem na galeria
 const downloadFile = async (uri, fileName) => {
   try {
@@ -300,11 +322,16 @@ const downloadFile = async (uri, fileName) => {
 
 // Componente da tela de prescrições médicas
 return (
+  <View style={styles.container}>
   <FlatList
     data={prescriptions.sort((a, b) => new Date(b.dateTime.seconds * 1000) - new Date(a.dateTime.seconds * 1000))}
     renderItem={renderPrescription}
-    keyExtractor={(item) => item.id.toString()}
-    ListHeaderComponent={(
+    refreshControl={
+      <RefreshControl
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+      />
+    }    ListHeaderComponent={(
       <>
         <TouchableOpacity style={styles.button} onPress={() => setModalVisible(true)}>
           <Text style={styles.buttonText}>Cadastrar Receita</Text>
@@ -315,15 +342,15 @@ return (
           <Text style={styles.legendTitle}>Legenda dos Ícones:</Text>
           <View style={styles.legendItem}>
             <Icon name="download" size={24} color="green" />
-            <Text style={styles.legendText}>Baixar Receita</Text>
+            <Text style={styles.legendText}>Baixar Receita/Prescrição</Text>
           </View>
           <View style={styles.legendItem}>
             <Icon name="edit" size={24} color="blue" />
-            <Text style={styles.legendText}>Editar Receita</Text>
+            <Text style={styles.legendText}>Editar Receita/Prescrição</Text>
           </View>
           <View style={styles.legendItem}>
             <Icon name="trash" size={24} color="red" />
-            <Text style={styles.legendText}>Excluir Receita</Text>
+            <Text style={styles.legendText}>Excluir Receita/Prescrição</Text>
           </View>
         </View>
 
@@ -338,7 +365,7 @@ return (
       <View style={styles.modalContainer}>
         <View style={styles.modalView}>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Text style={styles.closeButtonText}>×</Text>
+            <Text style={styles.closeButtonText}>x</Text>
           </TouchableOpacity>
           <Text style={styles.LabelMedicamento}>
             Título da Prescrição / Receita:
@@ -393,6 +420,7 @@ return (
     )}
     style={{ width: "100%" }}
   />
+  </View>
 );
 
 };
@@ -401,9 +429,29 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   container: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  authText: {
+    color: 'red', // Escolha uma cor que chame atenção
+    fontSize: 18,
+    textAlign: 'center',
+    margin: 20,
+  },
+  button: {
+    backgroundColor: '#007bff',
+    padding: 10,
+    borderRadius: 5,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
   },
   button: {
     backgroundColor: "#007bff",
@@ -557,11 +605,8 @@ const styles = StyleSheet.create({
     elevation: 4,
     width: "70%",
     justifyContent: "space-around",
-    alignSelf: "flex-start",
-
-
-
-  },
+    alignSelf: "center", // Altere aqui para "center" para centralizar o container
+},
   legendTitle: {
     fontSize: 18,
     fontWeight: 'bold',

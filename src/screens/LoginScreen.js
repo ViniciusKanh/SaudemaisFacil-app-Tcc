@@ -14,6 +14,8 @@ import { auth } from '../config/firebaseConfig';
 import Logo from "../components/Logo";
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import * as MediaLibrary from 'expo-media-library';
+import * as Notifications from 'expo-notifications';
+import * as Permissions from 'expo-permissions'; // Se necessário, para versões do Expo SDK < 41
 
 
 const LoginScreen = ({ navigation }) => {
@@ -24,12 +26,22 @@ const LoginScreen = ({ navigation }) => {
   const handleLogin = async () => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      // Solicitar permissões para a biblioteca de mídia
-      const permissionResponse = await MediaLibrary.requestPermissionsAsync();
-      if (permissionResponse.status === 'granted') {
-        navigation.navigate("Menu");
+  
+      // Solicitar permissões para mídia e notificações
+      const { status: mediaLibraryStatus } = await MediaLibrary.requestPermissionsAsync();
+      const { status: notificationsStatus } = await Notifications.requestPermissionsAsync({
+        ios: {
+          allowAlert: true,
+          allowBadge: true,
+          allowSound: true,
+          allowAnnouncements: true,
+        },
+      });
+  
+      if (mediaLibraryStatus !== 'granted' || notificationsStatus !== 'granted') {
+        Alert.alert("Permissão negada", "Algumas funcionalidades podem não estar disponíveis.");
       } else {
-        Alert.alert("Permissão negada", "Você não poderá salvar arquivos.");
+        navigation.navigate("Menu");
       }
     } catch (error) {
       Alert.alert("Erro no login", error.message);

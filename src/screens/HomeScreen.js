@@ -6,12 +6,10 @@ import { FontAwesome } from '@expo/vector-icons';
 import Logo from '../components/Logo';
 
 const HomeScreen = ({ navigation }) => {
-
   const handlePress = (screen) => {
     navigation.navigate(screen);
   };
 
-  // Agora cada Icon pode ter sua própria ação de navegação
   const Icon = ({ name, label, screen }) => (
     <TouchableOpacity style={styles.iconWrapper} onPress={() => handlePress(screen)}>
       <FontAwesome name={name} size={32} color="#2e7d32" />
@@ -21,19 +19,18 @@ const HomeScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-    <Logo width={200} height={160} />
+      <Logo width={200} height={160} />
       <View style={styles.iconGrid}>
-      <Icon name="medkit" label="Medicamentos" screen="Medicamentos" />
-
+        <Icon name="medkit" label="Medicamentos" screen="Medicamentos" />
         <Icon name="bell" label="Lembrete" screen="Lembretes" />
-        <Icon name="user" label="Perfil" screen="Perfil" /> 
+        <Icon name="user" label="Perfil" screen="Perfil" />
         <Icon name="stethoscope" label="Receitas" screen="Receitas" />
         <Icon name="heartbeat" label="Pressão / Diabetes" screen="Pressão / Diabetes" />
       </View>
     </View>
-
   );
 };
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,

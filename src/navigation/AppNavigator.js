@@ -8,6 +8,7 @@ import {
   Text,
   Modal,
   Button,
+  FlatList,
 } from "react-native";
 import { getAuth, signOut } from "firebase/auth";
 import { getStorage, ref, getDownloadURL } from "firebase/storage";
@@ -25,21 +26,32 @@ import LembretesScreen from "../screens/Lembretes/LembretesScreen";
 import RelRemindersConsultationScreen from "./../screens/Lembretes/Consulta/RelRemindersConsultationScreen";
 import AuthNavigator from "./AuthNavigator";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { Ionicons } from "@expo/vector-icons"; // ou qualquer outra biblioteca de ícones que preferir
-
+import { Ionicons, FontAwesome } from "@expo/vector-icons"; // ou qualquer outra biblioteca de ícones que preferir
+import ChatbotScreen from "../Api/ChatbotScreen"; // Ajuste o caminho conforme necessário
+import DoubtsScreen from "../Api/DoubtsScreen "; // Ajuste o caminho conforme necessário
+import { db } from "../config/firebaseConfig"; // Ajuste o caminho conforme sua estrutura de projeto
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  getDocs,
+  doc,
+  updateDoc,
+} from "firebase/firestore";
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-const AppNavigator = () => {
+export default function AppNavigator() {
   const [modalVisible, setModalVisible] = useState(false);
   const [userProfileImageUrl, setUserProfileImageUrl] = useState("");
   const auth = getAuth();
   const storage = getStorage();
-
-  const placeholderImage = require("../assets/perfil/profile-pic.jpg"); // Caminho para a imagem padrão
-  // Hook para obter o objeto de navegação
   const navigation = useNavigation();
+  const [pendingCount, setPendingCount] = useState(0);
+  const [isLembretesModalVisible, setLembretesModalVisible] = useState(false);
+  const [lembretesPendentes, setLembretesPendentes] = useState([]);
 
   useEffect(() => {
     if (auth.currentUser) {
@@ -49,170 +61,293 @@ const AppNavigator = () => {
       );
       getDownloadURL(userImageRef)
         .then((url) => {
-          // Use um estado para armazenar o URL da imagem
           setUserProfileImageUrl(url);
-          // Armazena o URL em cache para uso futuro
           Image.prefetch(url);
         })
         .catch(() => {
-          // Se não encontrar a imagem, pode usar uma imagem padrão.
           setUserProfileImageUrl(
-            Image.resolveAssetSource(placeholderImage).uri
+            Image.resolveAssetSource(
+              require("../assets/perfil/profile-pic.jpg")
+            ).uri
           );
         });
     }
   }, [auth.currentUser]);
 
+  // Função para buscar lembretes pendentes
+  const fetchReminders = async () => {
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) {
+      console.log("No user logged in");
+      return;
+    }
+
+    const remindersRef = collection(db, "remindersConsultation");
+    const q = query(
+      collection(db, "remindersConsultation"),
+      where("ID_user", "==", user.uid),
+      where("Status", "==", 0)
+    );
+    try {
+      const querySnapshot = await getDocs(q);
+      const reminders = querySnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setLembretesPendentes(reminders);
+      setPendingCount(reminders.length);
+    } catch (error) {
+      console.error("Failed to fetch reminders:", error);
+    }
+  };
+
+  // Função para buscar lembretes pendentes
+  const getPendingReminders = async () => {
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) {
+      console.error("No user logged in");
+      return [];
+    }
+
+    const remindersRef = collection(db, "remindersConsultation");
+    const q = query(
+      collection(db, "remindersConsultation"),
+      where("ID_user", "==", user.uid),
+      where("Status", "==", 0)
+    );
+    try {
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+      console.error("Failed to fetch reminders:", error);
+      return [];
+    }
+  };
+
+  useEffect(() => {
+    const auth = getAuth();
+    if (!auth.currentUser) {
+      console.log("No user logged in");
+      return;
+    }
+
+    const remindersRef = collection(db, "remindersConsultation");
+    const q = query(
+      remindersRef,
+      where("ID_user", "==", auth.currentUser.uid),
+      where("Status", "==", 0)
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (querySnapshot) => {
+        const updatedReminders = [];
+        querySnapshot.forEach((doc) => {
+          updatedReminders.push({ id: doc.id, ...doc.data() });
+        });
+        setLembretesPendentes(updatedReminders);
+        setPendingCount(updatedReminders.length);
+      },
+      (error) => {
+        console.error("Failed to fetch reminders due to an error: ", error);
+      }
+    );
+
+    // Clean up the listener when the component unmounts
+    return () => unsubscribe();
+  }, [auth.currentUser]); // Depend on currentUser to re-subscribe when user logs in/out
+
+  // Atualize a função para exibir o modal quando clicar no ícone de lembretes
+  const handleLembretesClick = () => {
+    setLembretesModalVisible(true);
+  };
+  useEffect(() => {
+    fetchReminders();
+  }, [auth.currentUser]);
+
   const handleLogout = () => {
     signOut(auth)
       .then(() => {
-        // Deslogou com sucesso, redirecione para o AuthNavigator
-        // Isso irá automaticamente levar o usuário para a primeira tela dentro do AuthNavigator, que é a tela de Login
         navigation.reset({
           index: 0,
-          routes: [{ name: "Auth" }], // Aqui você está resetando para o AuthNavigator
+          routes: [{ name: "Auth" }],
         });
         setModalVisible(false);
       })
       .catch((error) => {
-        // Houve um erro no logout
         Alert.alert("Erro ao sair", error.message);
       });
   };
 
-  // Defina a função navigateToScreen
-  const navigateToScreen = (screenName) => {
-    navigation.navigate(screenName);
-    setModalVisible(false); // Feche o modal após a navegação
+  const formatDate = (dateString) => {
+    const options = {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    };
+    return new Date(dateString).toLocaleDateString("pt-BR", options);
   };
 
-  const getHeaderRight = (routeName) => {
-    if (routeName === "Login" || routeName === "Register") {
-      return null; // Não exibe nada para a tela de Login e Registro
-    } else {
-      return () => (
-        <TouchableOpacity onPress={() => setModalVisible(true)}>
-          <Image
-            source={
-              userProfileImageUrl
-                ? { uri: userProfileImageUrl }
-                : placeholderImage
-            }
-            style={styles.profilePic}
-          />
-        </TouchableOpacity>
-      );
-    }
+  const navigateToScreen = (screenName) => {
+    navigation.navigate(screenName);
+    setModalVisible(false);
   };
 
   function BottomTabNavigator() {
-    const [modalVisible, setModalVisible] = useState(false);
-
     return (
-      <>
-        <Tab.Navigator
-          screenOptions={({ route }) => ({
-            tabBarIcon: ({ focused, color, size }) => {
-              let iconName;
+      <Tab.Navigator
+        screenOptions={({ route }) => ({
+          tabBarIcon: ({ focused, color, size }) => {
+            let iconName;
+            let userProfileImage =
+              userProfileImageUrl ||
+              Image.resolveAssetSource(
+                require("../assets/perfil/profile-pic.jpg")
+              ).uri;
 
-              if (route.name === "Home") {
+            switch (route.name) {
+              case "Home":
                 iconName = focused ? "home" : "home-outline";
-              } else if (route.name === "Profile") {
-                iconName = focused ? "person" : "person-outline";
-              } else if (route.name === "Medicamentos") {
-                iconName = focused ? "medkit" : "medkit-outline";
-              } else if (route.name === "Lembretes") {
+                return <Ionicons name={iconName} size={size} color={color} />;
+              case "Duvidas":
+                iconName = focused ? "help-circle" : "help-circle-outline";
+                return <Ionicons name={iconName} size={size} color={color} />;
+              case "Lembretes":
                 iconName = focused ? "alarm" : "alarm-outline";
-              } else if (route.name === "Saúde") {
-                iconName = focused ? "heart" : "heart-outline";
-              }
-              // Você pode continuar adicionando mais "else if" para outras telas
-
-              return <Ionicons name={iconName} size={size} color={color} />;
-            },
-            tabBarActiveTintColor: "green",
-            tabBarInactiveTintColor: "gray",
-            headerStyle: {
-              backgroundColor: "#65BF85",
-              height: 115,
-            },
-            headerTintColor: "#fff",
-            headerTitleStyle: {
-              fontWeight: "bold",
-              fontSize: 25,
-            },
-            headerRight: () =>
-              route.name !== "Login" && route.name !== "Register" ? (
-                <TouchableOpacity onPress={() => setModalVisible(true)}>
-                <Image
-                  source={{ uri: userProfileImageUrl || Image.resolveAssetSource(placeholderImage).uri }}
-                  style={styles.profilePic}
-                />
+                return <Ionicons name={iconName} size={size} color={color} />;
+              case "Perfils":
+                return (
+                  <TouchableOpacity onPress={() => setModalVisible(true)}>
+                    <Image
+                      source={{ uri: userProfileImage }}
+                      style={{
+                        width: size,
+                        height: size,
+                        borderRadius: size / 2,
+                      }}
+                    />
+                  </TouchableOpacity>
+                );
+              case "ChatBot-IA":
+                iconName = focused ? "comments" : "comment";
+                return (
+                  <FontAwesome name={iconName} size={size} color={color} />
+                );
+            }
+          },
+          tabBarActiveTintColor: "green",
+          tabBarInactiveTintColor: "gray",
+          headerStyle: {
+            backgroundColor: "#65BF85",
+            height: 115,
+          },
+          headerTintColor: "#fff",
+          headerTitleStyle: {
+            fontWeight: "bold",
+            fontSize: 25,
+          },
+          headerRight: () => null,
+          tabBarStyle: { paddingBottom: 45, height: 100 },
+        })}
+      >
+        <Tab.Screen name="Home" component={HomeScreen} />
+        <Tab.Screen
+          name="Lembretes"
+          component={LembretesScreen}
+          options={{
+            tabBarIcon: ({ focused, color, size }) => (
+              <Ionicons
+                name={focused ? "alarm" : "alarm-outline"}
+                size={size}
+                color={color}
+              />
+            ),
+            tabBarBadge: pendingCount > 0 ? pendingCount : undefined,
+            tabBarButton: (props) => (
+              <TouchableOpacity {...props} onPress={handleLembretesClick}>
+                {/* Adiciona ação para abrir a modal ou navegar para a tela de lembretes */}
               </TouchableOpacity>
-              ) : null,
-            tabBarStyle: { paddingBottom: 45, height: 100 }, // Ajuste conforme necessário
-          })}
-        >
-          <Tab.Screen name="Home" component={HomeScreen} />
-          <Tab.Screen name="Profile" component={PerfilScreen} />
-          <Tab.Screen name="Medicamentos" component={MedicationScreen} />
-          <Tab.Screen name="Lembretes" component={LembretesScreen} />
-          <Tab.Screen name="Saúde" component={InformationSaudeScreen} />
-          {/* Adicione mais Tab.Screen para outras telas que desejar */}
-        </Tab.Navigator>
-        <Stack.Screen
-          name="Auth"
-          component={AuthNavigator}
-          options={{ headerShown: false }}
+            ),
+          }}
         />
 
-        {/* Modal para logout */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={modalVisible}
-          onRequestClose={() => setModalVisible(false)}
-        >
-          <View style={styles.centeredView}>
-            <View style={styles.modalView}>
-              <Text style={styles.modalTitle}>Escolha uma Opção</Text>
-              {/* Botões de navegação */}
-             
-              {/* Botões de ação */}
-              <TouchableOpacity
-                style={[styles.buttonStyle, styles.logoutButton]}
-                onPress={handleLogout}
-              >
-                <Text style={styles.buttonText}>Logout</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.buttonStyle, styles.cancelButton]}
-                onPress={() => setModalVisible(false)}
-              >
-                <Text style={styles.buttonText}>Cancelar</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
-      </>
+        <Tab.Screen name="ChatBot-IA" component={ChatbotScreen} />
+        <Tab.Screen name="Duvidas" component={DoubtsScreen} />
+        <Tab.Screen name="Perfils" component={View} />
+      </Tab.Navigator>
     );
   }
 
+  const RenderItem = ({ item }) => {
+    const [expanded, setExpanded] = useState(false);
+
+    const handleComplete = async () => {
+      const reminderRef = doc(db, "remindersConsultation", item.id);
+      await updateDoc(reminderRef, { Status: 1 });
+      setLembretesPendentes(
+        lembretesPendentes.filter((reminder) => reminder.id !== item.id)
+      );
+      setExpanded(false);
+    };
+
+    const handleCancel = async () => {
+      const reminderRef = doc(db, "remindersConsultation", item.id);
+      await updateDoc(reminderRef, { Status: 2 });
+      setLembretesPendentes(
+        lembretesPendentes.filter((reminder) => reminder.id !== item.id)
+      );
+      setExpanded(false);
+    };
+
+    // Formatação da data e hora
+    const formattedDate = new Date(item.date_time).toLocaleDateString("pt-BR", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    });
+
+    return (
+      <TouchableOpacity
+        onPress={() => setExpanded(!expanded)}
+        style={styles.listItemContainer}
+      >
+        <Text style={styles.listItemTitle}>
+          Dr(a). {item.specialist} - {item.specialty}
+        </Text>
+        <Text style={styles.listItemDetail}>Local: {item.location}</Text>
+        <Text style={styles.listItemDetail}>Data: {formattedDate}</Text>
+        {expanded && (
+          <View style={styles.buttonContainer}>
+            <Button title="Concluir" onPress={handleComplete} />
+            <Button title="Cancelar" onPress={handleCancel} />
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <>
-<Stack.Navigator
-  screenOptions={({ route }) => ({
-    headerStyle: {
-      backgroundColor: "#65BF85",
-      height: 150 // Ajuste a altura aqui
-    },
-    headerTintColor: "#fff",
-    headerTitleStyle: {
-      fontWeight: "bold"
-    }
-  })}
->
-        {/* Stack.Screen para Login, Register, Home, e outras telas */}
+      <Stack.Navigator
+        screenOptions={({ route }) => ({
+          headerStyle: {
+            backgroundColor: "#65BF85",
+            height: 150,
+          },
+          headerTintColor: "#fff",
+          headerTitleStyle: {
+            fontWeight: "bold",
+          },
+        })}
+      >
         <Stack.Screen
           name="Auth"
           component={AuthNavigator}
@@ -221,28 +356,26 @@ const AppNavigator = () => {
         <Stack.Screen
           name="Menu"
           component={BottomTabNavigator}
-          options={{
-            headerShown: false, // Substitua '#FFF' pela cor desejada
-          }}
+          options={{ headerShown: false }}
         />
         <Stack.Screen name="Dados Pessoais" component={PerfilScreen} />
         <Stack.Screen name="Pressão / Diabetes" component={DCNTScreen} />
         <Stack.Screen name="Receitas" component={MedicalPrescriptionScreen} />
         <Stack.Screen name="Perfil" component={InformationSaudeScreen} />
         <Stack.Screen name="Histórico" component={InfoSaudePGScreen} />
+        <Stack.Screen name="Lembretes" component={LembretesScreen} />
         <Stack.Screen name="Medicamentos" component={MedicationScreen} />
+        <Stack.Screen name="ChatbotScreen" component={ChatbotScreen} />
+        <Stack.Screen name="Duvidas" component={DoubtsScreen} />
         <Stack.Screen
           name="Informações Saúde"
           component={DadosSaudeSaudeScreen}
         />
-        <Stack.Screen name="Lembretes" component={LembretesScreen} />
         <Stack.Screen
           name="Consultas"
           component={RelRemindersConsultationScreen}
         />
-        {/* ... outras telas ... */}
       </Stack.Navigator>
-
       {/* Modal para logout */}
       <Modal
         animationType="slide"
@@ -253,7 +386,6 @@ const AppNavigator = () => {
         <View style={styles.centeredView}>
           <View style={styles.modalView}>
             <Text style={styles.modalTitle}>Escolha uma Opção</Text>
-            {/* Botões de navegação */}
             <TouchableOpacity
               style={styles.buttonStyle}
               onPress={() => navigateToScreen("Perfil")}
@@ -272,7 +404,6 @@ const AppNavigator = () => {
             >
               <Text style={styles.buttonText}>Gestão de Medicamentos</Text>
             </TouchableOpacity>
-            {/* Botões de ação */}
             <TouchableOpacity
               style={[styles.buttonStyle, styles.logoutButton]}
               onPress={handleLogout}
@@ -288,16 +419,38 @@ const AppNavigator = () => {
           </View>
         </View>
       </Modal>
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isLembretesModalVisible}
+        onRequestClose={() => setLembretesModalVisible(false)}
+      >
+        <View style={styles.centeredView}>
+          <View style={styles.modalView}>
+            <Text style={styles.modalTitle}>Lembretes Pendentes</Text>
+            <FlatList
+              data={lembretesPendentes}
+              renderItem={({ item }) => <RenderItem item={item} />}
+              keyExtractor={(item) => item.id.toString()}
+              style={styles.flatListStyle}
+            />
+            <Button
+              title="Fechar"
+              onPress={() => setLembretesModalVisible(false)}
+            />
+          </View>
+        </View>
+      </Modal>
     </>
   );
-};
+}
 
 const styles = StyleSheet.create({
   centeredView: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.6)", // Fundo semi-transparente
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
   },
   modalView: {
     margin: 20,
@@ -313,7 +466,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
-    width: "80%", // Tamanho do modal
+    width: "80%",
   },
   modalTitle: {
     marginBottom: 15,
@@ -322,21 +475,34 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#333",
   },
+  listItem: {
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ccc",
+    alignItems: "flex-start",
+  },
+  listItemTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  listItemDetail: {
+    fontSize: 14,
+  },
   buttonStyle: {
-    backgroundColor: "#65BF85", // Cor verde para botões de navegação
+    backgroundColor: "#65BF85",
     borderRadius: 20,
     padding: 10,
     elevation: 2,
-    width: "100%", // Botões ocupam a largura total do modal
+    width: "100%",
     alignItems: "center",
-    marginVertical: 5, // Espaçamento vertical
+    marginVertical: 5,
   },
   logoutButton: {
-    backgroundColor: "#ff6347", // Cor vermelha para o logout
-    marginTop: 20, // Espaço extra acima do botão de logout
+    backgroundColor: "#ff6347",
+    marginTop: 20,
   },
   cancelButton: {
-    backgroundColor: "#6c757d", // Cor cinza para o cancelar
+    backgroundColor: "#6c757d",
   },
   buttonText: {
     color: "white",
@@ -345,9 +511,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   profilePicTAB: {
-    width: 60, // Ajuste a largura conforme necessário
-    height: 60, // Ajuste a altura conforme necessário
-    borderRadius: 25, // Isso fará a imagem circular
+    width: 60,
+    height: 60,
+    borderRadius: 25,
     marginRight: 10,
   },
   profilePic: {
@@ -356,6 +522,37 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     marginRight: 10,
   },
+  buttonContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 10,
+  },
+  listItemContainer: {
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ccc",
+    backgroundColor: "#fff", // Fundo branco para destacar os itens
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+    marginBottom: 10,
+    borderRadius: 8,
+  },
+  listItemTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#007bff", // Azul para destaque
+  },
+  listItemDetail: {
+    fontSize: 16,
+    color: "#666", // Cinza para detalhes
+    marginTop: 5,
+  },
+  buttonContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginTop: 10,
+  },
 });
-
-export default AppNavigator;
