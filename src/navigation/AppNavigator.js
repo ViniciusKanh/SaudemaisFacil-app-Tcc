@@ -20,7 +20,7 @@ import DCNTScreen from "../screens/DCNT/DCNT";
 import MedicalPrescriptionScreen from "../screens/medicalPrescriptionScreen";
 import InformationSaudeScreen from "../screens/InformationSaudeScreen";
 import InfoSaudePGScreen from "../screens/InfoSaudePG";
-import MedicationScreen from "../screens/MedicationScreen";
+import MedicationScreen from "../screens/Medicamento/MedicaNametionScreen";
 import DadosSaudeSaudeScreen from "../screens/InfSaudeScreen";
 import LembretesScreen from "../screens/Lembretes/LembretesScreen";
 import RelRemindersConsultationScreen from "./../screens/Lembretes/Consulta/RelRemindersConsultationScreen";
