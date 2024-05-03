@@ -20,38 +20,16 @@ import {
 import * as MediaLibrary from "expo-media-library";
 import * as Notifications from "expo-notifications";
 import * as Permissions from "expo-permissions"; // Se necessário, para versões do Expo SDK < 41
-import * as Google from "expo-auth-session/providers/google";
-import { ResponseType } from "expo-auth-session";
 import { MaterialIcons } from "@expo/vector-icons";
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
-  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    clientId: "YOUR_CLIENT_ID",
-  });
 
-  useEffect(() => {
-    if (response?.type === "success") {
-      const { id_token } = response.params;
 
-      const credential = GoogleAuthProvider.credential(id_token);
-      signInWithCredential(auth, credential)
-        .then(() => {
-          // Navegar para a próxima tela após sucesso no login
-          navigation.navigate("Menu");
-        })
-        .catch((error) => {
-          // Lidar com erros aqui
-          Alert.alert("Erro no login", error.message);
-        });
-    }
-  }, [response]);
 
-  const handleGoogleLogin = () => {
-    promptAsync();
-  };
+
 
   const handleLogin = async () => {
     try {
@@ -126,16 +104,6 @@ const LoginScreen = ({ navigation }) => {
           onChangeText={setPassword}
           secureTextEntry={true}
         />
-
-        {/* Botão de Login com Google */}
-        <View style={styles.googleButtonContainer}>
-  <TouchableOpacity style={styles.googleButton} onPress={handleGoogleLogin}>
-    <View style={styles.iconContainer}>
-      <Image source={require("../assets/img/google.png")} style={styles.icon} />
-    </View>
-    <Text style={styles.buttonText}>Entrar com Google</Text>
-  </TouchableOpacity>
-</View>
 
 
         <View style={styles.buttonContainer}>
@@ -234,7 +202,7 @@ const styles = StyleSheet.create({
   
   googleButton: {
     flexDirection: 'row',
-    backgroundColor: '#DB4437', // Cor do Google
+    backgroundColor: '#DB4437', 
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 30,
