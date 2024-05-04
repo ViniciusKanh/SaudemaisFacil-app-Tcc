@@ -24,6 +24,8 @@ import MedicationScreen from "../screens/Medicamento/MedicationScreen";
 import DadosSaudeSaudeScreen from "../screens/InfSaudeScreen";
 import LembretesScreen from "../screens/Lembretes/LembretesScreen";
 import RelRemindersConsultationScreen from "./../screens/Lembretes/Consulta/RelRemindersConsultationScreen";
+import HistoricoGlicemia from "../screens/DCNT/GlicemiaRellPersonalizado";
+import HistoricoPressao from "../screens/DCNT/PressaoArterialRellPersonalizado";
 import AuthNavigator from "./AuthNavigator";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons, FontAwesome } from "@expo/vector-icons"; // ou qualquer outra biblioteca de ícones que preferir
@@ -366,6 +368,10 @@ export default function AppNavigator() {
         <Stack.Screen name="Medicamentos" component={MedicationScreen} />
         <Stack.Screen name="ChatbotScreen" component={ChatbotScreen} />
         <Stack.Screen name="Duvidas" component={DoubtsScreen} />
+        <Stack.Screen name="Historico Glicemia" component={HistoricoGlicemia} />
+        <Stack.Screen name="Historico Pressão Arterial" component={HistoricoPressao} />
+
+
         <Stack.Screen
           name="Informações Saúde"
           component={DadosSaudeSaudeScreen}

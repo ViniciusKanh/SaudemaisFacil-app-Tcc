@@ -84,33 +84,6 @@ const InformationSaudeScreen = () => {
     return age;
   }
 
-  const calculateIMC = (weight, height) => {
-    if (weight && height) {
-      const heightInMeters = height / 100; // converte a altura de cm para metros
-      const imc = weight / (heightInMeters * heightInMeters);
-      return imc.toFixed(2); // retorna o IMC com duas casas decimais
-    }
-    return null;
-  };
-
-  const getClassificacaoIMC = (imc) => {
-    if (imc < 18.5) {
-      return { classificacao: "Magreza", grau: 0 };
-    } else if (imc >= 18.5 && imc <= 24.9) {
-      return { classificacao: "Normal", grau: 0 };
-    } else if (imc >= 25.0 && imc <= 29.9) {
-      return { classificacao: "Sobrepeso", grau: 1 };
-    } else if (imc >= 30.0 && imc <= 39.9) {
-      return { classificacao: "Obesidade", grau: 2 };
-    } else if (imc > 40.0) {
-      return { classificacao: "Obesidade Grave", grau: 3 };
-    } else {
-      return { classificacao: "Indeterminado", grau: "Indeterminado" };
-    }
-  };
-
-  const imc = calculateIMC(userData?.weight, userData?.height); // Assume que esta função retorna o IMC
-  const classificacao = getClassificacaoIMC(imc);
 
   // Usaremos o gancho de navegação para lidar com a navegação entre telas
   const navigation = useNavigation();
@@ -162,21 +135,6 @@ const InformationSaudeScreen = () => {
             {userData?.age ? `${userData.age} anos` : ""} (
             {userData?.classification})
           </Text>
-          <Text style={styles.healthInfo}>
-            Hipertenso: {userData?.hasHypertension ? "Sim" : "Não"}
-          </Text>
-          <Text style={styles.healthInfo}>
-            Diabético: {userData?.hasDiabetes ? "Sim" : "Não"}
-          </Text>
-          <Text style={styles.healthInfo}>
-            Doador de órgãos: {userData?.isOrganDonor ? "Sim" : "Não"}
-          </Text>
-          <View style={styles.healthInfoContainer}>
-            <Text style={styles.healthInfo}>
-              IMC: {imc} - {classificacao.classificacao} (Grau{" "}
-              {classificacao.grau})
-            </Text>
-          </View>
         </View>
       </View>
       <TouchableOpacity style={styles.button} onPress={handlePressInfoSaude}>

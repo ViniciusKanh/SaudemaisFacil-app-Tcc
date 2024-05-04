@@ -10,17 +10,14 @@ import {
   ScrollView,
   Alert,
   Image,
-  Platform,
+  RefreshControl,
 } from "react-native";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import { doc, getDoc, updateDoc, Timestamp } from "firebase/firestore";
 import { db } from "../config/firebaseConfig";
 import RNPickerSelect from "react-native-picker-select";
-import * as ImagePicker from "expo-image-picker";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import DateTimePicker from "@react-native-community/datetimepicker";
 import { collection, getDocs } from "firebase/firestore";
-import { Picker } from "@react-native-picker/picker";
+import { FontAwesome5, MaterialCommunityIcons } from "@expo/vector-icons";
 
 const auth = getAuth();
 
@@ -34,7 +31,6 @@ const InfSaudeScreen = (props) => {
     hadHeartAttack: false,
     hadStroke: false,
     takesControlledMedication: false,
-    profileImageUrl: "",
     height: "",
     weight: "",
   });
@@ -42,41 +38,22 @@ const InfSaudeScreen = (props) => {
   const [userId, setUserId] = useState("");
   const [availableBloodTypes, setAvailableBloodTypes] = useState([]);
   const [date, setDate] = useState(new Date()); // Estado para gerenciar a data
-  const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
   const [availableRaces, setAvailableRaces] = useState([]);
-  const { navigation } = props;
   const [selectedRace, setSelectedRace] = useState("");
-  // Função para mostrar o DateTimePicker
-  const showDatePicker = () => {
-    setIsDatePickerVisible(true);
-  };
+  const [refreshing, setRefreshing] = useState(false);
 
-  const handleDateChange = (event, selectedDate) => {
-    const currentDate = selectedDate || date;
-    setIsDatePickerVisible(Platform.OS === "ios"); // Esconda o DatePicker para Android após a seleção
-    setDate(currentDate); // Atualize o estado 'date' com a nova data
-    setUserData({
-      ...userData,
-      birthDate: currentDate.toLocaleDateString("pt-BR"), // Atualize a data de nascimento no estado 'userData'
-    });
-  };
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (authUser) => {
       if (authUser) {
-        setUserId(authUser.uid); // Atualize o userId aqui
+        setUserId(authUser.uid);
         fetchUserProfile(authUser.uid);
-      } else {
-        console.log("Nenhum usuário autenticado.");
-        // Aqui você pode tratar o que acontece se não houver usuário autenticado.
       }
     });
     fetchRaces();
     fetchBloodTypes();
 
-    return () => {
-      unsubscribeAuth();
-    };
+    return () => unsubscribeAuth();
   }, []);
 
   useEffect(() => {
@@ -88,9 +65,8 @@ const InfSaudeScreen = (props) => {
         const userSnap = await getDoc(userRef);
         if (userSnap.exists() && isMounted) {
           const userProfileData = userSnap.data();
-          const birthDate = userProfileData.birthDate.toDate
-            ? userProfileData.birthDate.toDate()
-            : new Date();
+          const birthDate = userProfileData.birthDate.toDate ? userProfileData.birthDate.toDate() : new Date();
+
 
           // Defina a raça para o valor correto baseado nos dados carregados
           const userRaceValue = userProfileData.race;
@@ -98,7 +74,7 @@ const InfSaudeScreen = (props) => {
           // Atualize o estado com os dados do perfil do usuário
           setUserData({
             ...userProfileData,
-            birthDate: birthDate.toLocaleDateString("pt-BR"),
+            birthDate: birthDate.toISOString(), // Armazenar como string ISO para consistência
             race: userRaceValue,
           });
 
@@ -126,32 +102,25 @@ const InfSaudeScreen = (props) => {
     };
   }, [auth.currentUser, availableRaces]);
 
-  const onRaceChange = (value) => {
-    setUserData({ ...userData, race: value });
-  };
-
   const fetchBloodTypes = async () => {
-    setAvailableBloodTypes(["A+", "O-", "B+", "AB+", "AB-", "O+", "B-"]);
+    setAvailableBloodTypes(["A-", "A+", "O-", "B+", "AB+", "AB-", "O+", "B-"]);
   };
 
   const fetchRaces = async () => {
     const raceCollectionRef = collection(db, "race");
-    try {
-      const raceSnapshot = await getDocs(raceCollectionRef);
-      const races = raceSnapshot.docs.map((doc) => ({
-        label: doc.data().Cor,
-        value: doc.id,
-      }));
-      setAvailableRaces(races);
-    } catch (error) {
-      console.error("Erro ao buscar raças:", error);
-      Alert.alert("Erro ao buscar raças", error.message);
-    }
+    const raceSnapshot = await getDocs(raceCollectionRef);
+    const races = raceSnapshot.docs.map((doc) => ({
+      label: doc.data().Cor,
+      value: doc.id,
+    }));
+    setAvailableRaces(races);
   };
 
-  const onBloodTypeChange = (itemValue) => {
-    setUserData({ ...userData, bloodType: itemValue });
-  };
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    fetchUserProfile(userId).then(() => setRefreshing(false)); // Assumindo que fetchUserProfile irá atualizar os estados necessários
+  }, [userId]);
+
 
   const fetchUserProfile = async (uid) => {
     const userRef = doc(db, "users", uid);
@@ -159,9 +128,8 @@ const InfSaudeScreen = (props) => {
       const userSnap = await getDoc(userRef);
       if (userSnap.exists()) {
         const userProfileData = userSnap.data();
-        const birthDate = userProfileData.birthDate.toDate
-          ? userProfileData.birthDate.toDate()
-          : new Date();
+        const birthDate = userProfileData.birthDate.toDate ? userProfileData.birthDate.toDate() : new Date();
+
 
         const raceValue = availableRaces.find(
           (race) => race.label === userProfileData.race
@@ -169,7 +137,7 @@ const InfSaudeScreen = (props) => {
 
         setUserData({
           ...userProfileData, // Dados recuperados do Firestore
-          birthDate: birthDate.toLocaleDateString("pt-BR"), // Data de nascimento formatada
+          birthDate: birthDate.toISOString(), // Armazenar como string ISO para consistência
           race: raceValue || "", // Use o valor correspondente encontrado
         });
 
@@ -184,15 +152,6 @@ const InfSaudeScreen = (props) => {
     }
   };
 
-  function converterDataParaISO(dataString) {
-    const partes = dataString.split("/");
-    if (partes.length !== 3) {
-      throw new Error("Formato de data inválido");
-    }
-    const [dia, mes, ano] = partes;
-    return `${ano}-${mes}-${dia}`;
-  }
-
   const [isSaving, setIsSaving] = useState(false); // Adiciona um estado para o indicador de carregamento.
 
   const handleSaveProfile = async () => {
@@ -200,115 +159,145 @@ const InfSaudeScreen = (props) => {
       Alert.alert("Erro", "ID do usuário não definido.");
       return;
     }
-
+  
     setIsSaving(true);
-
+  
+    // Encontrar o label da raça com base no valor selecionado
+    const raceLabel = availableRaces.find(race => race.value === userData.race)?.label;
+  
+    // Verificar se o label da raça foi encontrado antes de tentar salvar
+    if (!raceLabel) {
+      Alert.alert("Erro", "Raça selecionada não é válida.");
+      setIsSaving(false);
+      return;
+    }
+  
     try {
-      const birthDateParts = userData.birthDate.split("/");
-      const birthDateObj = new Date(
-        birthDateParts[2],
-        birthDateParts[1] - 1,
-        birthDateParts[0]
-      );
-
-      // Verificar se a data de nascimento é válida
-      if (isNaN(birthDateObj.getTime())) {
-        throw new Error("Data de nascimento inválida");
-      }
-
-      // Ajustar o horário para o início do dia para evitar problemas de fuso horário
-      birthDateObj.setHours(0, 0, 0, 0);
-
-      // Encontrar o label da raça com base no valor selecionado
-      const raceLabel = availableRaces.find(
-        (race) => race.value === userData.race
-      )?.label;
-
-      // Se a raça selecionada não estiver disponível, lance um erro
-      if (!raceLabel) {
-        throw new Error("Raça selecionada não é válida");
-      }
-
+      // Preparar os dados que serão atualizados, excluindo informações sensíveis
+      const dataToUpdate = {
+        race: raceLabel,
+        bloodType: userData.bloodType,
+        isOrganDonor: userData.isOrganDonor,
+        hasDiabetes: userData.hasDiabetes,
+        hasHypertension: userData.hasHypertension,
+        hadHeartAttack: userData.hadHeartAttack,
+        hadStroke: userData.hadStroke,
+        takesControlledMedication: userData.takesControlledMedication,
+        height: userData.height,
+        weight: userData.weight
+      };
+  
       // Atualizar o documento do usuário no Firestore
-      await updateDoc(doc(db, "users", userId), {
-        ...userData,
-        birthDate: Timestamp.fromDate(birthDateObj), // Salvar a data como Timestamp
-        race: raceLabel, // Salvar o label da raça
-      });
-
-      Alert.alert("Sucesso", "Perfil atualizado com sucesso.");
+      await updateDoc(doc(db, "users", userId), dataToUpdate);
+  
+      Alert.alert("Sucesso", "Perfil de saúde atualizado com sucesso.");
+      fetchUserProfile(userId); // Atualizar os dados do usuário após o salvamento
     } catch (error) {
       console.error("Erro ao salvar perfil:", error);
       Alert.alert("Erro", "Falha ao salvar o perfil: " + error.message);
     } finally {
-      setIsSaving(false); // Desativar o indicador de carregamento
+      setIsSaving(false);
     }
   };
+  
+  
 
-  const handleTextChange = (text, field) => {
+  const handleTextChange = (text, field) =>
     setUserData({ ...userData, [field]: text });
-  };
-  // Substitua 'default_avatar.png' pelo caminho para a sua imagem padrão
-  const defaultAvatar = Image.resolveAssetSource(
-    require("../assets/perfil/profile-pic.svg")
-  ).uri;
-
-  const handleImagePick = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 1,
-    });
-
-    // Verifique se a seleção não foi cancelada e se a matriz 'assets' está presente
-    if (!result.canceled && result.assets) {
-      // Supondo que só haja uma imagem selecionada, pegue o primeiro item da matriz 'assets'
-      const image = result.assets[0];
-
-      // Agora você pode usar 'image.uri' para acessar o URI da imagem selecionada
-      if (image.uri) {
-        uploadImage(image.uri);
-      }
-    }
-  };
-
-  // Função para lidar com a mudança dos Switches
-  const handleSwitchChange = (value, field) => {
+  const handleSwitchChange = (value, field) =>
     setUserData({ ...userData, [field]: value });
-  };
 
-  const uploadImage = async (uri) => {
-    try {
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      const storageRef = ref(getStorage(), `profile_images/${userId}.jpg`);
-      await uploadBytes(storageRef, blob);
-
-      const downloadUrl = await getDownloadURL(storageRef);
-      setUserData({ ...userData, profileImageUrl: downloadUrl });
-    } catch (e) {
-      console.error(e);
+  const getClassificationByAge = (age) => {
+    if (age >= 0 && age <= 12) {
+      return "Criança";
+    } else if (age >= 13 && age <= 17) {
+      return "Adolescente";
+    } else if (age >= 18 && age <= 29) {
+      return "Jovem";
+    } else if (age >= 30 && age <= 59) {
+      return "Adulto";
+    } else if (age >= 60 && age <= 100) {
+      return "Idoso";
+    } else if (age > 100) {
+      return "Ancião";
+    } else {
+      return "Não especificado";
     }
   };
 
-  const handleLogout = () => {
-    signOut(auth)
-      .then(() => {
-        // Deslogou com sucesso, redirecione para a tela de login
-        navigation.reset({
-          index: 0,
-          routes: [{ name: "Login" }], // O nome 'Login' deve corresponder ao nome da rota definida no Stack.Navigator
-        });
-      })
-      .catch((error) => {
-        // Houve um erro no logout
-        Alert.alert("Erro ao sair", error.message);
-      });
+  function getAge(birthDate) {
+    const birthDateObj = new Date(birthDate); // Certifica-se de converter a string ou timestamp para um objeto Date
+    const today = new Date();
+    let age = today.getFullYear() - birthDateObj.getFullYear();
+    const monthDiff = today.getMonth() - birthDateObj.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDateObj.getDate())) {
+      age--;
+    }
+    return age;
+  }
+  
+
+  const calculateIMC = (weight, height) => {
+    const heightInMeters = height / 100;
+    return (weight / heightInMeters ** 2).toFixed(2);
   };
+
+  const getClassificacaoIMC = (imc) => {
+    if (imc < 18.5) return { classificacao: "Magreza", grau: 0 };
+    if (imc < 25) return { classificacao: "Normal", grau: 0 };
+    if (imc < 30) return { classificacao: "Sobrepeso", grau: 1 };
+    if (imc < 40) return { classificacao: "Obesidade", grau: 2 };
+    return { classificacao: "Obesidade Grave", grau: 3 };
+  };
+
+  const age = getAge(new Date(userData.birthDate));
+  const imc = calculateIMC(userData.weight, userData.height);
+  const imcClassification = getClassificacaoIMC(imc);
+
   return (
     <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer} >    
+  style={styles.container}
+  contentContainerStyle={styles.contentContainer}
+  refreshControl={
+    <RefreshControl
+      refreshing={refreshing}
+      onRefresh={onRefresh}
+    />
+  }
+>
+      <View style={styles.summaryContainer}>
+        <Text style={styles.summaryTitle}>Resumo</Text>
+        <View style={styles.summaryRow}>
+          <FontAwesome5 name="user-nurse" size={24} style={styles.iconStyle} />
+          <Text style={styles.summaryText}>
+            Doador de Órgãos: {userData.isOrganDonor ? "Sim" : "Não"}
+          </Text>
+        </View>
+        <View style={styles.summaryRow}>
+          <FontAwesome5 name="heartbeat" size={24} style={styles.iconStyle} />
+          <Text style={styles.summaryText}>
+            Hipertensão: {userData.hasHypertension ? "Sim" : "Não"}
+          </Text>
+        </View>
+        <View style={styles.summaryRow}>
+          <MaterialCommunityIcons
+            name="pill"
+            size={24}
+            style={styles.iconStyle}
+          />
+          <Text style={styles.summaryText}>
+            Medicação Controlada:{" "}
+            {userData.takesControlledMedication ? "Sim" : "Não"}
+          </Text>
+        </View>
+        <View style={styles.summaryRow}>
+          <FontAwesome5 name="weight" size={24} style={styles.iconStyle} />
+          <Text style={styles.summaryText}>
+            IMC: {imc} - {imcClassification.classificacao} (Grau{" "}
+            {imcClassification.grau})
+          </Text>
+        </View>
+      </View>
       <View style={styles.infoContainer}>
         <Text style={styles.label}>Cor</Text>
         <RNPickerSelect
@@ -507,7 +496,43 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
-});
+  summaryContainer: {
+    backgroundColor: "#e3f2fd",
+    padding: 20,
+    borderRadius: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1.41,
+    elevation: 2,
+    marginTop: 50,
 
+  },
+  summaryTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#1976d2",
+    marginBottom: 15,
+
+  },
+  summaryText: {
+    fontSize: 18,
+    marginLeft: 10,
+  },
+  summaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  iconStyle: {
+    color: "#1976d2",
+  },
+  yes: {
+    color: "green",
+  },
+  no: {
+    color: "red",
+  },
+});
 
 export default InfSaudeScreen;

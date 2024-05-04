@@ -41,14 +41,9 @@ const MedicalPrescriptionScreen = () => {
   const navigation = useNavigation();
   const [refreshing, setRefreshing] = useState(false); // Estado para controlar o refresh
   const animation = useRef(new Animated.Value(0)).current;
+  const [typePrescriptionsMap, setTypePrescriptionsMap] = useState({});
 
 
-
-  // Efeito para buscar os tipos de receita e as prescrições
-  useEffect(() => {
-    fetchTypesPrescription();
-    authenticate();
-  }, []);
 
   useEffect(() => {
     Animated.loop(
@@ -60,12 +55,13 @@ const MedicalPrescriptionScreen = () => {
   }, []);
 
   const onRefresh = () => {
-    const auth = getAuth();
-    const user = auth.currentUser;
+    const user = getAuth().currentUser;
     if (user) {
+      setRefreshing(true);
       fetchPrescriptions(user.uid);
     }
   };
+  
   
 
   const authenticate = async () => {
@@ -94,30 +90,45 @@ const MedicalPrescriptionScreen = () => {
   const fetchTypesPrescription = async () => {
     try {
       const querySnapshot = await getDocs(collection(db, "TypePrescription"));
-      const fetchedTypes = querySnapshot.docs.map(doc => ({
-        label: doc.data().Type,
-        value: doc.id
-      }));
-      setTypesPrescription(fetchedTypes);
+      const typesMap = {}; // Cria um objeto para mapear IDs para nomes
+      querySnapshot.forEach(doc => {
+        typesMap[doc.id] = doc.data().Type; // Assume que o nome do tipo está sob a chave 'Type'
+      });
+      setTypePrescriptionsMap(typesMap); // Salva o mapa no estado
     } catch (error) {
       console.error("Erro ao buscar tipos de prescrição:", error);
       Alert.alert("Erro", "Não foi possível buscar os tipos de prescrição.");
     }
   };
-
+  
   const fetchPrescriptions = async (userID) => {
     if (!userID) return;
     setRefreshing(true);
     try {
       const presQuery = query(collection(db, "medicalPrescription"), where("ID_users", "==", userID));
       const querySnapshot = await getDocs(presQuery);
-      setPrescriptions(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const prescriptionsData = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        const typeName = typePrescriptionsMap[data.type] || "Tipo desconhecido"; // Usa o mapa para substituir o ID pelo nome
+        return { id: doc.id, ...data, typeName }; // Inclui o nome do tipo no objeto de prescrição
+      });
+      setPrescriptions(prescriptionsData);
     } catch (error) {
       console.error("Erro ao buscar prescrições médicas:", error);
       Alert.alert("Erro", "Não foi possível buscar as prescrições médicas.");
     }
     setRefreshing(false);
   };
+  
+  useEffect(() => {
+    fetchTypesPrescription().then(() => {
+      if (getAuth().currentUser) {
+        fetchPrescriptions(getAuth().currentUser.uid);
+      }
+    });
+    authenticate();
+  }, []);
+  
 
   if (!isAuthenticated) {
     return (
@@ -139,7 +150,9 @@ const MedicalPrescriptionScreen = () => {
     setSelectedImage(null); // Limpa a imagem selecionada
     setMedicamento(""); // Limpa o campo de medicamento
     setTipoReceita(""); // Reseta a seleção do tipo de receita
+    setCurrentPrescriptionId(null); // Limpa o ID atual após fechar o modal
   };
+  
 
   // Função para escolher uma foto da galeria
   const handleChoosePhoto = async () => {
@@ -196,54 +209,64 @@ const MedicalPrescriptionScreen = () => {
     }
   };
 
-  // Função para enviar a prescrição para o banco de dados
-  const handleUploadPrescription = async () => {
-    if (!selectedImage) {
-      alert("Por favor, selecione uma imagem.");
-      return;
-    }
+// Função para enviar ou atualizar a prescrição no banco de dados
+const handleUploadPrescription = async () => {
+  if (!selectedImage) {
+    alert("Por favor, selecione uma imagem.");
+    return;
+  }
 
-    try {
-      const blob = await new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.onload = () => resolve(xhr.response);
-        xhr.onerror = (e) => {
-          console.error(e);
-          reject(new TypeError("Network request failed"));
-        };
-        xhr.responseType = "blob";
-        xhr.open("GET", selectedImage, true);
-        xhr.send(null);
-      });
+  try {
+    const blob = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.onload = () => resolve(xhr.response);
+      xhr.onerror = (e) => {
+        console.error(e);
+        reject(new TypeError("Network request failed"));
+      };
+      xhr.responseType = "blob";
+      xhr.open("GET", selectedImage, true);
+      xhr.send(null);
+    });
 
-      const fileRef = ref(storage, `prescriptions/${new Date().toISOString()}`);
-      await uploadBytes(fileRef, blob);
-      blob.close();
+    const fileRef = ref(storage, `prescriptions/${new Date().toISOString()}`);
+    await uploadBytes(fileRef, blob);
+    blob.close();
 
-      const downloadUrl = await getDownloadURL(fileRef);
-      const auth = getAuth();
-      const user = auth.currentUser;
-      const userID = user ? user.uid : "";
+    const downloadUrl = await getDownloadURL(fileRef);
+    const auth = getAuth();
+    const user = auth.currentUser;
+    const userID = user ? user.uid : "";
 
-      await addDoc(collection(db, "medicalPrescription"), {
-        ID_users: userID,
-        Medicamento: medicamento,
-        dateTime: new Date(),
-        file: downloadUrl,
-        type: tipoReceita,
-      });
+    const prescriptionData = {
+      ID_users: userID,
+      Medicamento: medicamento,
+      dateTime: new Date(),
+      file: downloadUrl,
+      type: tipoReceita,
+    };
 
-      setModalVisible(false);
-      setSelectedImage(null); // Limpar a imagem selecionada
-      setMedicamento(""); // Limpa o campo de medicamento
-      setTipoReceita(""); // Reseta a seleção do tipo de receita
-      fetchPrescriptions(userID); // Atualiza a lista após salvar uma nova prescrição
+    if (currentPrescriptionId) {
+      // Atualiza o documento existente
+      await updateDoc(doc(db, "medicalPrescription", currentPrescriptionId), prescriptionData);
+      alert("Prescrição atualizada com sucesso.");
+    } else {
+      // Adiciona um novo documento
+      await addDoc(collection(db, "medicalPrescription"), prescriptionData);
       alert("Prescrição salva com sucesso.");
-    } catch (error) {
-      console.error("Erro ao salvar prescrição: ", error);
-      alert("Erro ao salvar prescrição.");
     }
-  };
+
+    setModalVisible(false);
+    setSelectedImage(null); // Limpar a imagem selecionada
+    setMedicamento(""); // Limpa o campo de medicamento
+    setTipoReceita(""); // Reseta a seleção do tipo de receita
+    fetchPrescriptions(userID); // Atualiza a lista após salvar/atualizar uma prescrição
+  } catch (error) {
+    console.error("Erro ao salvar prescrição: ", error);
+    alert("Erro ao salvar prescrição.");
+  }
+};
+
 
   // Adicione uma função para deletar uma prescrição
   const deletePrescription = async (id) => {
@@ -256,29 +279,38 @@ const MedicalPrescriptionScreen = () => {
           text: "Excluir",
           onPress: async () => {
             await deleteDoc(doc(db, "medicalPrescription", id));
-            fetchPrescriptions(); // Atualiza a lista após a exclusão
+            // Chamada para atualizar a lista após a exclusão
+            fetchPrescriptions(getAuth().currentUser?.uid);
           },
         },
       ]
     );
   };
-
-  // Atualiza a função de edição para usar o novo estado
+  
   const editPrescription = (prescription) => {
     setMedicamento(prescription.Medicamento);
-    setTipoReceita(prescription.type);
+    setTipoReceita(prescription.type);  // Certifique-se de que este 'type' corresponde ao ID esperado pelo Picker
     setSelectedImage(prescription.file);
-    setCurrentPrescriptionId(prescription.id); // Armazena o ID da prescrição atual para edição
+    setCurrentPrescriptionId(prescription.id);
     setModalVisible(true);
   };
+  
 
   // Renderiza cada item da lista de prescrições
   const renderPrescription = ({ item }) => (
     <View style={styles.prescriptionCard}>
-      <Text style={styles.cardText}><Text style={styles.boldText}>Medicamento:</Text> {item.Medicamento}</Text>
-      <Text style={styles.cardText}><Text style={styles.boldText}>Tipo:</Text> {item.type}</Text>
-      <Text style={styles.cardText}><Text style={styles.boldText}>Data:</Text> {item.dateTime.toDate().toLocaleDateString()}</Text>
-      {item.file && <Image source={{ uri: item.file }} style={styles.cardImage} />}
+      <Text style={styles.cardText}>
+        <Text style={styles.boldText}>Medicamento:</Text> {item.Medicamento}
+      </Text>
+      <Text style={styles.cardText}>
+        <Text style={styles.boldText}>Tipo:</Text> {item.typeName}
+      </Text>
+      <Text style={styles.cardText}>
+        <Text style={styles.boldText}>Data:</Text> {item.dateTime.toDate().toLocaleDateString()}
+      </Text>
+      {item.file && (
+        <Image source={{ uri: item.file }} style={styles.cardImage} />
+      )}
       <View style={styles.iconContainer}>
         <TouchableOpacity onPress={() => downloadFile(item.file, `Prescription_${item.id}.jpg`)}>
           <Icon name="download" size={24} color="green" style={styles.icon} />
@@ -292,6 +324,9 @@ const MedicalPrescriptionScreen = () => {
       </View>
     </View>
   );
+  
+  
+
 
 // Função para baixar e salvar a imagem na galeria
 const downloadFile = async (uri, fileName) => {
@@ -378,18 +413,16 @@ return (
           />
           <Text style={styles.label}>Categoria de Receita:</Text>
           <Picker
-            selectedValue={tipoReceita}
-            onValueChange={(itemValue) => setTipoReceita(itemValue)}
-            style={styles.picker}
-          >
-            {typesPrescription.map((type) => (
-              <Picker.Item
-                key={type.value}
-                label={type.label}
-                value={type.value}
-              />
-            ))}
-          </Picker>
+  selectedValue={tipoReceita}
+  onValueChange={(itemValue, itemIndex) => setTipoReceita(itemValue)}
+  style={styles.picker}
+>
+  {Object.entries(typePrescriptionsMap).map(([key, value]) => (
+    <Picker.Item key={key} label={value} value={key} />
+  ))}
+</Picker>
+
+
           <View style={{ height: 180 }} />
           <TouchableOpacity style={styles.button} onPress={handleTakePhoto}>
             <Text style={styles.buttonText}>Tirar Foto</Text>

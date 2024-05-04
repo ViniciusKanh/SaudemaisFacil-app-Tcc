@@ -1,4 +1,4 @@
-// InfoSaudePG.js
+//PressaoArterialRellPersonalizado.js
 import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
@@ -6,85 +6,65 @@ import {
   StyleSheet,
   ScrollView,
   RefreshControl,
-  Button,
-  TextInput,
-  Alert,
   TouchableOpacity,
-  Platform, 
+  Alert,
+  TextInput
 } from "react-native";
 import { getAuth } from "firebase/auth";
-import { db } from "../config/firebaseConfig";
-import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
+import { db } from "../../config/firebaseConfig";
+import { collection, query, where, getDocs, orderBy,Timestamp } from "firebase/firestore";
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import XLSX from 'xlsx';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
+const recordsPerPage = 10;
 
-const InfoSaudePG = () => {
-  const [pressaoData, setPressaoData] = useState([]);
-  const [glicemiaData, setGlicemiaData] = useState([]);
-  const [refreshing, setRefreshing] = useState(false);
-  const [startDate, setStartDate] = useState(new Date());
-  const [endDate, setEndDate] = useState(new Date());
-  const [showStartDatePicker, setShowStartDatePicker] = useState(false);
-  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
-  const auth = getAuth();
-  const user = auth.currentUser;
-  const [averageSistolica, setAverageSistolica] = useState(0);
-const [averageDiastolica, setAverageDiastolica] = useState(0);
-const [mostFrequentHumorPressao, setMostFrequentHumorPressao] = useState('');
-const [tonturaDias, setTonturaDias] = useState(0);
-const [averageGlicemia, setAverageGlicemia] = useState(0);
-const [mostFrequentHumorGlicemia, setMostFrequentHumorGlicemia] = useState('');
-const [jejumDias, setJejumDias] = useState(0);
+const PressaoArterialMonitoramento = () => {
+    const [pressaoData, setPressaoData] = useState([]);
+    const [refreshing, setRefreshing] = useState(false);
+    const [startDate, setStartDate] = useState(new Date());
+    const [endDate, setEndDate] = useState(new Date());
+    const [showStartDatePicker, setShowStartDatePicker] = useState(false);
+    const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+    const [averageSistolica, setAverageSistolica] = useState(0);
+    const [averageDiastolica, setAverageDiastolica] = useState(0);
+    const [mostFrequentHumorPressao, setMostFrequentHumorPressao] = useState('');
+    const [tonturaDias, setTonturaDias] = useState(0);
+    const [totalPages, setTotalPages] = useState(0);
+    const [currentPage, setCurrentPage] = useState(0);
 
+    const auth = getAuth();
+    const user = auth.currentUser;
 
-const calculateStatistics = () => {
-  const totalSistolica = pressaoData.reduce((acc, curr) => acc + parseInt(curr.Sistolica, 10), 0);
-  const totalDiastolica = pressaoData.reduce((acc, curr) => acc + parseInt(curr.Diastolica, 10), 0);
-  const averageSistolica = totalSistolica / pressaoData.length;
-  const averageDiastolica = totalDiastolica / pressaoData.length;
-
-  const humorCountsPressao = pressaoData.reduce((acc, curr) => {
-    acc[curr.Humor] = (acc[curr.Humor] || 0) + 1;
-    return acc;
-  }, {});
-  const mostFrequentHumorPressao = Object.keys(humorCountsPressao).reduce(
-    (a, b) => (humorCountsPressao[a] > humorCountsPressao[b] ? a : b), ""
-  );
+  const calculateStatistics = () => {
+    const totalSistolica = pressaoData.reduce((acc, curr) => acc + parseInt(curr.Sistolica, 10), 0);
+    const totalDiastolica = pressaoData.reduce((acc, curr) => acc + parseInt(curr.Diastolica, 10), 0);
+    const averageSistolica = totalSistolica / pressaoData.length;
+    const averageDiastolica = totalDiastolica / pressaoData.length;
   
-  const tonturaDias = pressaoData.filter((item) => item.Tontura).length;
+    const humorCountsPressao = pressaoData.reduce((acc, curr) => {
+      acc[curr.Humor] = (acc[curr.Humor] || 0) + 1;
+      return acc;
+    }, {});
+    const mostFrequentHumorPressao = Object.keys(humorCountsPressao).reduce(
+      (a, b) => (humorCountsPressao[a] > humorCountsPressao[b] ? a : b), ""
+    );
+    
+    const tonturaDias = pressaoData.filter((item) => item.Tontura).length;
+  
+   
+  
+    // Atualizar os estados
+    setAverageSistolica(averageSistolica);
+    setAverageDiastolica(averageDiastolica);
+    setMostFrequentHumorPressao(mostFrequentHumorPressao);
+    setTonturaDias(tonturaDias);
+  }
 
-  const totalGlicemia = glicemiaData.reduce(
-    (acc, curr) => acc + parseInt(curr.Glicemia, 10),
-    0
-  );
-  const averageGlicemia = totalGlicemia / glicemiaData.length;
 
-  const humorCountsGlicemia = glicemiaData.reduce((acc, curr) => {
-    acc[curr.Humor] = (acc[curr.Humor] || 0) + 1;
-    return acc;
-  }, {});
-  const mostFrequentHumorGlicemia = Object.keys(humorCountsGlicemia).reduce(
-    (a, b) => (humorCountsGlicemia[a] > humorCountsGlicemia[b] ? a : b),
-    ""
-  );
-
-  const jejumDias = glicemiaData.filter((item) => item.Infasting).length;
-
-  // Atualizar os estados
-  setAverageSistolica(averageSistolica);
-  setAverageDiastolica(averageDiastolica);
-  setMostFrequentHumorPressao(mostFrequentHumorPressao);
-  setTonturaDias(tonturaDias);
-  setAverageGlicemia(averageGlicemia);
-  setMostFrequentHumorGlicemia(mostFrequentHumorGlicemia);
-  setJejumDias(jejumDias);
-}
-
-  useEffect(() => {
+useEffect(() => {
     if (pressaoData.length > 0) {
       const totalSistolica = pressaoData.reduce((acc, curr) => acc + parseInt(curr.Sistolica, 10), 0);
       const averageSistolicaCalc = totalSistolica / pressaoData.length;
@@ -104,28 +84,12 @@ const calculateStatistics = () => {
       const tonturaCount = pressaoData.filter(item => item.Tontura).length;
       setTonturaDias(tonturaCount);
     }
-  
-    if (glicemiaData.length > 0) {
-      const totalGlicemia = glicemiaData.reduce((acc, curr) => acc + parseInt(curr.Glicemia, 10), 0);
-      const averageGlicemiaCalc = totalGlicemia / glicemiaData.length;
-      setAverageGlicemia(averageGlicemiaCalc);
-  
-      const humorCountsGlicemia = {};
-      glicemiaData.forEach(item => {
-        humorCountsGlicemia[item.Humor] = (humorCountsGlicemia[item.Humor] || 0) + 1;
-      });
-      const mostFrequentGlicemia = Object.keys(humorCountsGlicemia).reduce((a, b) => humorCountsGlicemia[a] > humorCountsGlicemia[b] ? a : b, "");
-      setMostFrequentHumorGlicemia(mostFrequentGlicemia);
-  
-      const jejumCount = glicemiaData.filter(item => item.Infasting).length;
-      setJejumDias(jejumCount);
-    }
-  }, [pressaoData, glicemiaData]);
+
+  }, [pressaoData]);
   
   useEffect(() => {
     calculateStatistics();
-  }, [pressaoData, glicemiaData]);
-  
+  }, [pressaoData]);
 
   useEffect(() => {
     if (user && startDate && endDate) {
@@ -139,7 +103,6 @@ const calculateStatistics = () => {
       return;
     }
     await fetchPressaoArterial();
-    await fetchGlicemia();
   };
 
   const onRefresh = useCallback(async () => {
@@ -162,19 +125,10 @@ const calculateStatistics = () => {
       orderBy("DataHora", "desc")
     );
     const querySnapshot = await getDocs(q);
+    const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     setPressaoData(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-  };
+    setTotalPages(Math.ceil(data.length / recordsPerPage));
 
-  const fetchGlicemia = async () => {
-    const q = query(
-      collection(db, "diabetes"),
-      where("ID_user", "==", user.uid),
-      where("Datetime", ">=", startDate),
-      where("Datetime", "<=", endDate),
-      orderBy("Datetime", "desc")
-    );
-    const querySnapshot = await getDocs(q);
-    setGlicemiaData(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
   };
 
   const onChangeStartDate = (event, selectedDate) => {
@@ -205,12 +159,7 @@ const calculateStatistics = () => {
       "Humor": data.Humor,
       "Tontura/Dor": data.Tontura ? "Sim" : "Não",
     })));
-    const ws2 = XLSX.utils.json_to_sheet(glicemiaData.map(data => ({
-      "Data e Hora": new Date(data.Datetime.seconds * 1000).toLocaleString(),
-      "Glicemia": data.Glicemia,
-      "Em Jejum": data.Infasting ? "Sim" : "Não",
-      "Humor": data.Humor,
-    })));
+
   
     // Adicione resumos à planilha
     const summaryData = [
@@ -218,18 +167,14 @@ const calculateStatistics = () => {
       ["Média de Pressão Arterial Diastólica", averageDiastolica.toFixed(1)],
       ["Humor Mais Frequente (Pressão)", mostFrequentHumorPressao],
       ["Dias com Tontura", tonturaDias],
-      ["Média de Glicemia", averageGlicemia.toFixed(1)],
-      ["Humor Mais Frequente (Glicemia)", mostFrequentHumorGlicemia],
-      ["Dias em Jejum", jejumDias]
     ];
     const ws3 = XLSX.utils.aoa_to_sheet(summaryData);
     
     XLSX.utils.book_append_sheet(wb, ws1, "Pressão Arterial");
-    XLSX.utils.book_append_sheet(wb, ws2, "Glicemia");
     XLSX.utils.book_append_sheet(wb, ws3, "Resumo de Saúde");
     
     const wbout = XLSX.write(wb, { type: 'base64', bookType: "xlsx" });
-    const uri = `${FileSystem.cacheDirectory}dadosSaude.xlsx`;
+    const uri = `${FileSystem.cacheDirectory}PressaoArterial_Data.xlsx`;
     await FileSystem.writeAsStringAsync(uri, wbout, { encoding: FileSystem.EncodingType.Base64 });
   
     try {
@@ -251,98 +196,65 @@ const calculateStatistics = () => {
     </View>
   );
 
-  const renderPressaoTable = () => (
-    <View style={styles.table}>
-      <TableHeader
-        headers={["Data/Hora", "Pressão Alta/Baixa", "Humor", "Tontura/Dor"]}
-      />
-      {pressaoData.map((item, index) => {
-        const sistolica = parseInt(item.Sistolica, 10);
-        const diastolica = parseInt(item.Diastolica, 10);
-        let backgroundColor = "#fff"; // Cor padrão
+  const renderPressaoTable = () => {
+    const startIndex = currentPage * recordsPerPage;
+    const endIndex = startIndex + recordsPerPage;
+    const currentData = pressaoData.slice(startIndex, endIndex);
   
-        // Altera a cor de fundo se a pressão estiver alta ou baixa
-        if (sistolica > 140 || diastolica > 90) {
-          backgroundColor = "#ffcccc"; // Vermelho claro para pressão alta
-        } else if (sistolica < 110 || diastolica < 60) {
-          backgroundColor = "#ccccff"; // Azul claro para pressão baixa
-        }
-  
-        return (
-          <View key={index} style={[styles.tableRow, { backgroundColor }]}>
-            <Text style={styles.tableCell}>
-              {new Date(item.DataHora.seconds * 1000).toLocaleString()}
-            </Text>
-            <Text style={styles.tableCell}>{`${item.Sistolica}/${item.Diastolica}`}</Text>
-            <Text style={styles.tableCell}>{item.Humor}</Text>
-            <Text style={styles.tableCell}>{item.Tontura ? "Sim" : "Não"}</Text>
-          </View>
-        );
-      })}
-    </View>
-  );
-  
-  const calculateGlicemiaSummary = () => {
-    if (!glicemiaData.length) {
-      return <Text style={styles.summaryText}>Carregando dados... ( Inserir data de inicial e Final)</Text>;
-    }
-
-    const totalGlicemia = glicemiaData.reduce(
-      (acc, curr) => acc + parseInt(curr.Glicemia, 10),
-      0
-    );
-    const averageGlicemia = totalGlicemia / glicemiaData.length;
-
-    const humorCounts = glicemiaData.reduce((acc, curr) => {
-      acc[curr.Humor] = (acc[curr.Humor] || 0) + 1;
-      return acc;
-    }, {});
-    const mostFrequentHumor = Object.keys(humorCounts).reduce(
-      (a, b) => (humorCounts[a] > humorCounts[b] ? a : b),
-      ""
-    );
-
-    const jejumDias = glicemiaData.filter((item) => item.Infasting).length;
-
     return (
-      <Text style={styles.summaryText}>
-        A média de glicemia do usuário foi{" "}
-        <Text style={styles.boldText}>{averageGlicemia.toFixed(1)} mg/dL</Text>{" "}
-        nos últimos 30 dias. O humor mais frequente foi{" "}
-        <Text style={styles.boldText}>{mostFrequentHumor}</Text>
-        {", "}e a pessoa esteve em jejum por{" "}
-        <Text style={styles.boldText}>{jejumDias}</Text> dias.
-      </Text>
+      <View style={styles.greenContainer}>
+        <TableHeader headers={["Data/Hora", "Pressão Arterial", "Humor", "Tontura/Dor"]} />
+        {currentData.map((item, index) => {
+          const backgroundColor = getBackgroundColor(item);
+          return (
+            <View key={index} style={[styles.tableRow, { backgroundColor }]}>
+              <Text style={styles.tableCell}>{new Date(item.DataHora.seconds * 1000).toLocaleString()}</Text>
+              <Text style={styles.tableCell}>{`${item.Sistolica}/${item.Diastolica}`}</Text>
+              <Text style={styles.tableCell}>{item.Humor}</Text>
+              <Text style={styles.tableCell}>{item.Tontura ? "Sim" : "Não"}</Text>
+            </View>
+          );
+        })}
+        {renderPaginationControls()}
+      </View>
     );
   };
-
-  const renderGlicemiaTable = () => (
-    <View style={styles.table}>
-      <TableHeader headers={["Data e Hora", "Glicemia", "Em Jejum", "Humor"]} />
-      {glicemiaData.map((item, index) => {
-        let backgroundColor = "#fff"; // Cor padrão para linhas normais
   
-        if (item.Glicemia > 100) {
-          backgroundColor = "#ffcccc"; // Vermelho claro para glicemia alta
-        } else if (item.Glicemia < 70) {
-          backgroundColor = "#ccccff"; // Azul claro para glicemia baixa
-        }
+  const renderPaginationControls = () => (
+    <View style={styles.paginationContainer}>
+      <TouchableOpacity
+        onPress={() => setCurrentPage(currentPage - 1)}
+        disabled={currentPage === 0}
+        style={styles.paginationButton}
+      >
+        <Text>Anterior</Text>
+      </TouchableOpacity>
   
-        return (
-          <View key={index} style={[styles.tableRow, { backgroundColor }]}>
-            <Text style={styles.tableCell}>
-              {new Date(item.Datetime.seconds * 1000).toLocaleString()}
-            </Text>
-            <Text style={styles.tableCell}>{`${item.Glicemia} mg/dL`}</Text>
-            <Text style={styles.tableCell}>
-              {item.Infasting ? "Sim" : "Não"}
-            </Text>
-            <Text style={styles.tableCell}>{item.Humor}</Text>
-          </View>
-        );
-      })}
+      <Text style={styles.pageNumberText}>
+        {currentPage + 1} de {totalPages}
+      </Text>
+  
+      <TouchableOpacity
+        onPress={() => setCurrentPage(currentPage + 1)}
+        disabled={currentPage >= totalPages - 1}
+        style={styles.paginationButton}
+      >
+        <Text>Próximo</Text>
+      </TouchableOpacity>
     </View>
   );
+  
+  const getBackgroundColor = (item) => {
+    const sistolica = parseInt(item.Sistolica, 10);
+    const diastolica = parseInt(item.Diastolica, 10);
+    if (sistolica > 140 || diastolica > 90) {
+      return "#ffcccc"; // Vermelho claro para pressão alta
+    } else if (sistolica < 110 || diastolica < 60) {
+      return "#ccccff"; // Azul claro para pressão baixa
+    }
+    return "#fff"; // Cor padrão
+  };
+  
   const calculateSummary = () => {
     if (!pressaoData.length) {
       return (
@@ -379,16 +291,11 @@ const calculateStatistics = () => {
   };
   
   const SummarySection = () => (
-    <View style={styles.summarySection}>
+    <View style={styles.summaryGreenContainer}>
       {calculateSummary()}
     </View>
   );
 
-  const GlicemiaSummarySection = () => (
-    <View style={styles.summarySection}>
-      {calculateGlicemiaSummary()}
-    </View>
-  );
   const renderDatePickers = () => (
     <View style={styles.datePickerContainer}>
       <View style={styles.dateInputWrapper}>
@@ -424,35 +331,32 @@ const calculateStatistics = () => {
       <Text style={styles.legendTitle}>Legenda de Cores:</Text>
       <View style={styles.legendItem}>
         <View style={[styles.colorBox, { backgroundColor: '#ffcccc' }]} />
-        <Text style={styles.legendText}>Pressão / Glicemia Alta</Text>
+        <Text style={styles.legendText}>Pressão  Alta</Text>
       </View>
       <View style={styles.legendItem}>
         <View style={[styles.colorBox, { backgroundColor: '#ccccff' }]} />
-        <Text style={styles.legendText}>Pressão / Glicemia Baixa</Text>
+        <Text style={styles.legendText}>Pressão  Baixa</Text>
       </View>
     </View>
   );
 
-
   return (
     <ScrollView style={styles.container} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
-      <Text style={styles.pageTitle}>Monitoramento de Saúde</Text>
+      <Text style={styles.pageTitle}>Monitoramento de Pressão Arterial</Text>
       {renderDatePickers()}
       {renderExportButton()}
       {ColorLegend()}
       <View style={styles.section}>
-        <Text style={styles.title}>Pressão Arterial - Últimos 30 dias</Text>
+        <Text style={styles.title}>Pressão Arterial - Historico</Text>
         {renderPressaoTable()}
       </View>
       <SummarySection />
-      <View style={[styles.section, styles.sectionWithSpacing]}>
-        <Text style={styles.title}>Glicemia - Últimos 30 dias</Text>
-        {renderGlicemiaTable()}
-      </View>
-      <GlicemiaSummarySection />
     </ScrollView>
   );
 };
+
+
+// Styles
 
 const styles = StyleSheet.create({
   legendContainer: {
@@ -473,39 +377,10 @@ const styles = StyleSheet.create({
   table: {
     alignSelf: "stretch", // Para ocupar toda a largura disponível
   },
-  tableRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center", // Para centralizar os itens na linha
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: "#ddd",
-  },
-  tableCell: {
-    flex: 1,
-    fontSize: 16,
-    paddingHorizontal: 2, // Adiciona um pequeno espaçamento horizontal
-    textAlign: "center", // Centraliza o texto na célula
-  },
-  tableHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    padding: 8,
-    backgroundColor: "#f0f0f0", // Cor de fundo do cabeçalho
-  },
   tableHeaderCell: {
     fontWeight: "bold", // Texto em negrito
     fontSize: 16, // Tamanho do texto
     // Adicione mais estilos conforme necessário
-  },
-  summaryText: {
-    fontSize: 18, // Make sure the text is larger if needed
-    marginTop: 10, // Add some space above the summary for clarity
-    // Add any other styling you wish here
-  },
-  boldText: {
-    fontWeight: "bold",
-    // You might not need additional properties here as <Text> style inheritance works within nested <Text> components
   },
   // Make sure you have styles for your summarySection if you need to adjust layout or padding
   summarySection: {
@@ -603,6 +478,66 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     textAlign: 'center',
   },
+  greenContainer: {
+    backgroundColor: '#EDF3EF', // Cor de fundo verde claro
+    borderColor: '#9CCC65', // Cor da borda verde
+    borderWidth: 1, // Espessura da borda
+    borderRadius: 10, // Arredondamento da borda
+    padding: 10, // Espaçamento interno
+    marginBottom: 20, // Espaçamento abaixo do contêiner
+  },
+
+  tableHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: 10,
+    backgroundColor: "#f0f0f0",
+  },
+  tableRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ddd",
+  },
+  tableCell: {
+    flex: 1,
+    textAlign: "center",
+  },
+  paginationButton: {
+    padding: 10,
+    backgroundColor: "#E0E0E0",
+    borderRadius: 5,
+    marginHorizontal: 20, // Adiciona espaço horizontal entre os botões e o texto
+  },
+  pageNumberText: {
+    fontSize: 16,
+    // Você pode adicionar margem aqui se precisar, mas `justifyContent: 'space-between'` deve ser suficiente
+  },
+  paginationContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between", // Isso espalhará os botões e o texto de forma igual
+    alignItems: "center",
+    padding: 10,
+  },
+  summaryGreenContainer: {
+    backgroundColor: '#EDF3EF', // Cor de fundo verde claro
+    borderColor: '#9CCC65', // Cor da borda verde
+    borderWidth: 1, // Espessura da borda
+    borderRadius: 10, // Arredondamento da borda
+    padding: 20, // Espaçamento interno
+    marginBottom: 20, // Espaçamento abaixo do contêiner
+    marginHorizontal: 10, // Margem horizontal para alinhamento estético
+  },
+  summaryText: {
+    fontSize: 18, // Tamanho do texto
+    color: '#333', // Cor do texto para melhor leitura
+    lineHeight: 24, // Espaçamento entre linhas
+    textAlign: 'center', // Centralizar texto
+  },
+  boldText: {
+    fontWeight: 'bold', // Negrito
+  },
 });
 
-export default InfoSaudePG;
+export default PressaoArterialMonitoramento;
