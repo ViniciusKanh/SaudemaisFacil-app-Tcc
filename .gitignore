@@ -3,6 +3,9 @@
 # dependencies
 node_modules/
 
+# Ignorar pasta de segredos
+secrets/
+
 # Expo
 .expo/
 dist/

@@ -30,6 +30,7 @@ import AuthNavigator from "./AuthNavigator";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons, FontAwesome } from "@expo/vector-icons"; // ou qualquer outra biblioteca de ícones que preferir
 import ChatbotScreen from "../Api/ChatbotScreen"; // Ajuste o caminho conforme necessário
+
 import DoubtsScreen from "../Api/DoubtsScreen "; // Ajuste o caminho conforme necessário
 import { db } from "../config/firebaseConfig"; // Ajuste o caminho conforme sua estrutura de projeto
 import {
@@ -367,6 +368,7 @@ export default function AppNavigator() {
         <Stack.Screen name="Lembretes" component={LembretesScreen} />
         <Stack.Screen name="Medicamentos" component={MedicationScreen} />
         <Stack.Screen name="ChatbotScreen" component={ChatbotScreen} />
+
         <Stack.Screen name="Duvidas" component={DoubtsScreen} />
         <Stack.Screen name="Historico Glicemia" component={HistoricoGlicemia} />
         <Stack.Screen name="Historico Pressão Arterial" component={HistoricoPressao} />

@@ -1,3 +1,4 @@
+//firebaseConfig.js
 import { initializeApp, getApps } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth, initializeAuth, getReactNativePersistence } from "firebase/auth";
@@ -5,7 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBLt5WHIc7nItlIQJA40inMxTa1RrgQLAY",
+  apiKey: "AIzaSyBsygfQBwQUvJHdEQwHUxoaxKVw1Fa7JpI",
   authDomain: "saudemaisfacil-71347.firebaseapp.com",
   projectId: "saudemaisfacil-71347",
   storageBucket: "saudemaisfacil-71347.appspot.com",
@@ -23,10 +24,15 @@ if (getApps().length === 0) {
   app = initializeApp(firebaseConfig);
   db = getFirestore(app);
   storage = getStorage(app);
-
   auth = initializeAuth(app, {
     persistence: getReactNativePersistence(AsyncStorage)
   });
+
+  // Log the Firebase App and Auth instances to ensure they are initialized correctly
+  console.log("Firebase App instance:", app);
+  console.log("Firebase Auth instance:", auth);
 }
 
-export { db, auth, storage,app };
+export { db, auth, storage, app };
+
+

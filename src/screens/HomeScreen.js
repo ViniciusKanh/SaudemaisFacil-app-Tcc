@@ -26,6 +26,7 @@ const HomeScreen = ({ navigation }) => {
         <Icon name="user" label="Perfil" screen="Perfil" />
         <Icon name="stethoscope" label="Receitas" screen="Receitas" />
         <Icon name="heartbeat" label="Pressão / Diabetes" screen="Pressão / Diabetes" />
+
       </View>
     </View>
   );
