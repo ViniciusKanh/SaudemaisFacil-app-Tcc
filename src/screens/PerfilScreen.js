@@ -12,11 +12,10 @@ import {
   Platform,
 } from "react-native";
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
-import { doc, getDoc, updateDoc,Timestamp  } from "firebase/firestore";
+import { doc, getDoc, updateDoc, Timestamp } from "firebase/firestore";
 import { db } from "../config/firebaseConfig";
 import * as ImagePicker from "expo-image-picker";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import DateTimePicker from "@react-native-community/datetimepicker";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 
 const calendarIcon = require("../assets/icones/calendario.png");
@@ -116,20 +115,20 @@ const PerfilScreen = (props) => {
       Alert.alert("Erro", "ID do usuário não definido.");
       return;
     }
-  
+
     setIsSaving(true);
-  
+
     try {
       // Aqui você precisa converter o objeto Date para um Timestamp antes de atualizar
       const birthDateTimestamp = Timestamp.fromDate(userData.birthDate);
-      
+
       await updateDoc(doc(db, "users", userId), {
         fullName: userData.fullName,
         // Certifique-se de passar o objeto Timestamp aqui
         birthDate: birthDateTimestamp,
         phoneNumber: userData.phoneNumber,
       });
-      
+
       Alert.alert("Sucesso", "Perfil atualizado com sucesso.");
     } catch (error) {
       console.error("Erro ao salvar perfil:", error);
@@ -138,7 +137,6 @@ const PerfilScreen = (props) => {
       setIsSaving(false);
     }
   };
-  
 
   const handleDateChange = (event, selectedDate) => {
     setIsDatePickerVisible(false);
@@ -218,13 +216,16 @@ const PerfilScreen = (props) => {
     try {
       // Cria um Timestamp a partir da data
       const birthDate = Timestamp.fromDate(date); // Use o objeto Timestamp importado
-  
+
       // Atualiza a coleção de usuários com a nova data de nascimento
       const userRef = doc(db, "users", userId);
       await updateDoc(userRef, {
         birthDate: birthDate, // Utiliza o Timestamp
       });
-      Alert.alert("Data de Nascimento", "Data de nascimento atualizada com sucesso.");
+      Alert.alert(
+        "Data de Nascimento",
+        "Data de nascimento atualizada com sucesso."
+      );
     } catch (error) {
       console.error("Erro ao atualizar a data de nascimento:", error);
       Alert.alert("Erro", "Não foi possível atualizar a data de nascimento.");
@@ -240,17 +241,19 @@ const PerfilScreen = (props) => {
       await updateBirthDate(auth.currentUser.uid, date);
     } catch (error) {
       console.error("Erro ao confirmar data de nascimento:", error);
-      Alert.alert("Erro", "Não foi possível atualizar a data de nascimento: " + error.message);
+      Alert.alert(
+        "Erro",
+        "Não foi possível atualizar a data de nascimento: " + error.message
+      );
     }
   };
-  
-  
+
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.contentContainer}
     >
-<TouchableOpacity
+      <TouchableOpacity
         style={styles.profileImageContainer}
         onPress={handleImagePick}
       >
@@ -278,9 +281,12 @@ const PerfilScreen = (props) => {
         <DateTimePickerModal
           isVisible={isDatePickerVisible}
           mode="date"
-          onConfirm={handleConfirmDate}
+          onConfirm={(date) => {
+            setUserData({ ...userData, birthDate: date });
+            setIsDatePickerVisible(false);
+          }}
           onCancel={() => setIsDatePickerVisible(false)}
-          date={userData.birthDate || new Date()} // Garante que uma data válida seja usada
+          date={userData.birthDate}
         />
         <Text style={styles.label}>E-mail</Text>
         <TextInput

@@ -19,7 +19,6 @@ import {
 } from "firebase/auth";
 import * as MediaLibrary from "expo-media-library";
 import * as Notifications from "expo-notifications";
-import * as Permissions from "expo-permissions"; // Se necessário, para versões do Expo SDK < 41
 import { MaterialIcons } from "@expo/vector-icons";
 
 const LoginScreen = ({ navigation }) => {

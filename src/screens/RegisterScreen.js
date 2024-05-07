@@ -19,7 +19,6 @@ import {
 } from "firebase/auth";
 import { doc, setDoc, Timestamp } from "firebase/firestore";
 import Logo from "../components/Logo";
-import DateTimePicker from "@react-native-community/datetimepicker";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 
 const RegisterScreen = () => {
@@ -30,10 +29,6 @@ const RegisterScreen = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
-
-  const showDateTimePicker = () => {
-    setShowDatePicker(true);
-  };
 
   // Função para lidar com a confirmação da data
   const handleConfirmDate = (date) => {
@@ -96,17 +91,12 @@ const RegisterScreen = () => {
         <Text style={styles.label}>Data de Nascimento</Text>
       </TouchableOpacity>
       {showDatePicker && (
-        <DateTimePicker
-          testID="dateTimePicker"
-          value={birthDate}
+        <DateTimePickerModal
+          isVisible={isDatePickerVisible}
           mode="date"
-          display="default"
-          onChange={(event, selectedDate) => {
-            const currentDate = selectedDate || birthDate;
-            setShowDatePicker(Platform.OS === "ios");
-            setBirthDate(currentDate);
-          }}
-          maximumDate={new Date()}
+          onConfirm={handleConfirmDate}
+          onCancel={() => setIsDatePickerVisible(false)}
+          date={birthDate}
         />
       )}
     </View>

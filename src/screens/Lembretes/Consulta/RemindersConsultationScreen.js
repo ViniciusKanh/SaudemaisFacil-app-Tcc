@@ -45,11 +45,15 @@ const RemindersConsultationScreen = ({ isVisible, onClose }) => {
     }
     const keyboardDidShowListener = Keyboard.addListener(
       "keyboardDidShow",
-      (e) => setState(prev => ({ ...prev, keyboardPadding: e.endCoordinates.height }))
+      (e) =>
+        setState((prev) => ({
+          ...prev,
+          keyboardPadding: e.endCoordinates.height,
+        }))
     );
     const keyboardDidHideListener = Keyboard.addListener(
       "keyboardDidHide",
-      () => setState(prev => ({ ...prev, keyboardPadding: 0 }))
+      () => setState((prev) => ({ ...prev, keyboardPadding: 0 }))
     );
 
     return () => {
@@ -59,32 +63,41 @@ const RemindersConsultationScreen = ({ isVisible, onClose }) => {
   }, [isVisible]);
 
   useEffect(() => {
-    const subscription = Notifications.addNotificationReceivedListener(notification => {
-      console.log('Notificação recebida:', notification);
-    });
-  
+    const subscription = Notifications.addNotificationReceivedListener(
+      (notification) => {
+        console.log("Notificação recebida:", notification);
+      }
+    );
+
     return () => subscription.remove();
   }, []);
 
   const fetchTypeConsultation = async () => {
     const querySnapshot = await getDocs(collection(db, "TypeConsultation"));
-    const fetchedTypes = querySnapshot.docs.map(doc => ({
+    const fetchedTypes = querySnapshot.docs.map((doc) => ({
       id: doc.id,
       name: doc.data().type, // Certifique-se de que 'name' é o campo correto no seu documento
     }));
-    setState(prev => ({ ...prev, typeOptions: fetchedTypes }));
+    setState((prev) => ({ ...prev, typeOptions: fetchedTypes }));
   };
-  
 
   const handleConfirmDate = (selectedDate) => {
     const currentDate = selectedDate || state.date;
-    setState(prev => ({ ...prev, date: currentDate, isDatePickerVisible: false }));
+    setState((prev) => ({
+      ...prev,
+      date: currentDate,
+      isDatePickerVisible: false,
+    }));
   };
 
   const handleConfirmTime = (selectedTime) => {
     const newDate = new Date(state.date);
     newDate.setHours(selectedTime.getHours(), selectedTime.getMinutes());
-    setState(prev => ({ ...prev, date: newDate, isTimePickerVisible: false }));
+    setState((prev) => ({
+      ...prev,
+      date: newDate,
+      isTimePickerVisible: false,
+    }));
   };
 
   const handleSaveReminder = async () => {
@@ -92,15 +105,21 @@ const RemindersConsultationScreen = ({ isVisible, onClose }) => {
       alert("Usuário não está logado.");
       return;
     }
-  
+
     const permission = await Notifications.getPermissionsAsync();
     if (!permission.granted) {
-      alert("Permissão de notificação negada. O lembrete não poderá ser notificado.");
-      return;
+      const newPermission = await Notifications.requestPermissionsAsync();
+      if (!newPermission.granted) {
+        alert(
+          "Permissão de notificação negada. O lembrete não poderá ser notificado."
+        );
+        return;
+      }
     }
-  
+
     const formattedDateTime = state.date.toISOString();
     try {
+      const deviceToken = await Notifications.getExpoPushTokenAsync();
       await addDoc(collection(db, "remindersConsultation"), {
         ID_user: user.uid,
         Type: state.typeConsultation.id,
@@ -111,40 +130,36 @@ const RemindersConsultationScreen = ({ isVisible, onClose }) => {
         specialty: state.specialty,
         WarningHours: Number(state.warningHours),
         Status: 0,
+        deviceToken: deviceToken,
       });
-  
-      // Notificação de teste imediato
-      const immediateNotification = await Notifications.scheduleNotificationAsync({
-        content: {
-          title: "Teste de Notificação",
-          body: "Seu sistema de notificações está funcionando!",
-          sound: true,
-        },
-        trigger: { seconds: 1 }, // Dispara imediatamente
-      });
-  
-      console.log('Notificação imediata agendada:', immediateNotification);
-  
-      // Calculando o horário da notificação agendada
+
+      // Agendar a notificação com a antecedência configurada
       const notificationTime = new Date(formattedDateTime);
-      notificationTime.setHours(notificationTime.getHours() - state.warningHours);
-  
+      notificationTime.setHours(
+        notificationTime.getHours() - state.warningHours
+      );
+
       if (notificationTime > new Date()) {
-        const scheduledNotification = await Notifications.scheduleNotificationAsync({
-          content: {
-            title: "Lembrete de Consulta",
-            body: `Sua consulta está agendada para ${formatDateDisplay(notificationTime)}`,
-            sound: true,
-          },
-          trigger: notificationTime,
-        });
-  
-        console.log('Notificação agendada:', scheduledNotification);
+        const scheduledNotification =
+          await Notifications.scheduleNotificationAsync({
+            content: {
+              title: "Lembrete de Consulta",
+              body: `Sua consulta com ${state.specialist} em ${
+                state.location
+              } está agendada para ${formatDateDisplay(notificationTime)}`,
+              sound: "default",
+            },
+            trigger: notificationTime,
+          });
+
+        console.log("Notificação agendada:", scheduledNotification);
         alert("Lembrete salvo e notificação agendada com sucesso!");
       } else {
-        alert("A data e hora do lembrete já passaram, ajuste para um momento futuro.");
+        alert(
+          "A data e hora do lembrete já passaram, ajuste para um momento futuro."
+        );
       }
-  
+
       resetForm(); // Função para resetar o formulário
       onClose(); // Fechando o modal após o salvamento
     } catch (error) {
@@ -152,18 +167,7 @@ const RemindersConsultationScreen = ({ isVisible, onClose }) => {
       alert("Erro ao salvar lembrete.");
     }
   };
-  
-  
-  
-  const resetForm = () => {
-    setState({
-      ...initialState,
-      date: new Date(), // Mantém a data atualizada
-      typeOptions: state.typeOptions, // Mantém as opções carregadas para tipo de consulta
-    });
-  };
-  
-  
+
   const formatDateDisplay = (date) => {
     return date.toLocaleDateString("pt-BR", {
       day: "2-digit",
@@ -174,6 +178,15 @@ const RemindersConsultationScreen = ({ isVisible, onClose }) => {
       hour12: false,
     });
   };
+
+  const resetForm = () => {
+    setState({
+      ...initialState,
+      date: new Date(), // Mantém a data atualizada
+      typeOptions: state.typeOptions, // Mantém as opções carregadas para tipo de consulta
+    });
+  };
+
 
   return (
     <Modal
@@ -191,17 +204,36 @@ const RemindersConsultationScreen = ({ isVisible, onClose }) => {
             <Picker
               selectedValue={state.typeConsultation.id}
               onValueChange={(itemValue) => {
-                const selectedType = state.typeOptions.find(option => option.id === itemValue);
-                setState(prev => ({ ...prev, typeConsultation: { id: itemValue, name: selectedType.name } }));
+                const selectedType = state.typeOptions.find(
+                  (option) => option.id === itemValue
+                );
+                setState((prev) => ({
+                  ...prev,
+                  typeConsultation: { id: itemValue, name: selectedType.name },
+                }));
               }}
               style={styles.picker}
             >
               {state.typeOptions.map((option) => (
-                <Picker.Item key={option.id} label={option.name} value={option.id} />
+                <Picker.Item
+                  key={option.id}
+                  label={option.name}
+                  value={option.id}
+                />
               ))}
             </Picker>
-            <Button title="Escolher Data" onPress={() => setState(prev => ({ ...prev, isDatePickerVisible: true }))} />
-            <Button title="Escolher Hora" onPress={() => setState(prev => ({ ...prev, isTimePickerVisible: true }))} />
+            <Button
+              title="Escolher Data"
+              onPress={() =>
+                setState((prev) => ({ ...prev, isDatePickerVisible: true }))
+              }
+            />
+            <Button
+              title="Escolher Hora"
+              onPress={() =>
+                setState((prev) => ({ ...prev, isTimePickerVisible: true }))
+              }
+            />
             <Text style={styles.dateDisplay}>
               {formatDateDisplay(state.date)}
             </Text>
@@ -209,39 +241,51 @@ const RemindersConsultationScreen = ({ isVisible, onClose }) => {
               isVisible={state.isDatePickerVisible}
               mode="date"
               onConfirm={handleConfirmDate}
-              onCancel={() => setState(prev => ({ ...prev, isDatePickerVisible: false }))}
+              onCancel={() =>
+                setState((prev) => ({ ...prev, isDatePickerVisible: false }))
+              }
               date={state.date}
             />
             <DateTimePickerModal
               isVisible={state.isTimePickerVisible}
               mode="time"
               onConfirm={handleConfirmTime}
-              onCancel={() => setState(prev => ({ ...prev, isTimePickerVisible: false }))}
+              onCancel={() =>
+                setState((prev) => ({ ...prev, isTimePickerVisible: false }))
+              }
               date={state.date}
             />
             <TextInput
               placeholder="Horas de aviso"
               value={state.warningHours.toString()}
-              onChangeText={(text) => setState(prev => ({ ...prev, warningHours: Number(text) }))}
+              onChangeText={(text) =>
+                setState((prev) => ({ ...prev, warningHours: Number(text) }))
+              }
               style={styles.input}
               keyboardType="numeric"
             />
             <TextInput
               placeholder="Local"
               value={state.location}
-              onChangeText={(text) => setState(prev => ({ ...prev, location: text }))}
+              onChangeText={(text) =>
+                setState((prev) => ({ ...prev, location: text }))
+              }
               style={styles.input}
             />
             <TextInput
               placeholder="Especialista"
               value={state.specialist}
-              onChangeText={(text) => setState(prev => ({ ...prev, specialist: text }))}
+              onChangeText={(text) =>
+                setState((prev) => ({ ...prev, specialist: text }))
+              }
               style={styles.input}
             />
             <TextInput
               placeholder="Especialidade"
               value={state.specialty}
-              onChangeText={(text) => setState(prev => ({ ...prev, specialty: text }))}
+              onChangeText={(text) =>
+                setState((prev) => ({ ...prev, specialty: text }))
+              }
               style={styles.input}
             />
             <TouchableOpacity

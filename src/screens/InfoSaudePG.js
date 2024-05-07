@@ -10,17 +10,16 @@ import {
   TextInput,
   Alert,
   TouchableOpacity,
-  Platform, 
+  Platform,
 } from "react-native";
 import { getAuth } from "firebase/auth";
 import { db } from "../config/firebaseConfig";
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
-import DateTimePicker from '@react-native-community/datetimepicker';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
-import XLSX from 'xlsx';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-
+import DateTimePickerModal from "react-native-modal-datetime-picker";
+import * as FileSystem from "expo-file-system";
+import * as Sharing from "expo-sharing";
+import XLSX from "xlsx";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 const InfoSaudePG = () => {
   const [pressaoData, setPressaoData] = useState([]);
@@ -33,99 +32,121 @@ const InfoSaudePG = () => {
   const auth = getAuth();
   const user = auth.currentUser;
   const [averageSistolica, setAverageSistolica] = useState(0);
-const [averageDiastolica, setAverageDiastolica] = useState(0);
-const [mostFrequentHumorPressao, setMostFrequentHumorPressao] = useState('');
-const [tonturaDias, setTonturaDias] = useState(0);
-const [averageGlicemia, setAverageGlicemia] = useState(0);
-const [mostFrequentHumorGlicemia, setMostFrequentHumorGlicemia] = useState('');
-const [jejumDias, setJejumDias] = useState(0);
+  const [averageDiastolica, setAverageDiastolica] = useState(0);
+  const [mostFrequentHumorPressao, setMostFrequentHumorPressao] = useState("");
+  const [tonturaDias, setTonturaDias] = useState(0);
+  const [averageGlicemia, setAverageGlicemia] = useState(0);
+  const [mostFrequentHumorGlicemia, setMostFrequentHumorGlicemia] =
+    useState("");
+  const [jejumDias, setJejumDias] = useState(0);
 
+  const calculateStatistics = () => {
+    const totalSistolica = pressaoData.reduce(
+      (acc, curr) => acc + parseInt(curr.Sistolica, 10),
+      0
+    );
+    const totalDiastolica = pressaoData.reduce(
+      (acc, curr) => acc + parseInt(curr.Diastolica, 10),
+      0
+    );
+    const averageSistolica = totalSistolica / pressaoData.length;
+    const averageDiastolica = totalDiastolica / pressaoData.length;
 
-const calculateStatistics = () => {
-  const totalSistolica = pressaoData.reduce((acc, curr) => acc + parseInt(curr.Sistolica, 10), 0);
-  const totalDiastolica = pressaoData.reduce((acc, curr) => acc + parseInt(curr.Diastolica, 10), 0);
-  const averageSistolica = totalSistolica / pressaoData.length;
-  const averageDiastolica = totalDiastolica / pressaoData.length;
+    const humorCountsPressao = pressaoData.reduce((acc, curr) => {
+      acc[curr.Humor] = (acc[curr.Humor] || 0) + 1;
+      return acc;
+    }, {});
+    const mostFrequentHumorPressao = Object.keys(humorCountsPressao).reduce(
+      (a, b) => (humorCountsPressao[a] > humorCountsPressao[b] ? a : b),
+      ""
+    );
 
-  const humorCountsPressao = pressaoData.reduce((acc, curr) => {
-    acc[curr.Humor] = (acc[curr.Humor] || 0) + 1;
-    return acc;
-  }, {});
-  const mostFrequentHumorPressao = Object.keys(humorCountsPressao).reduce(
-    (a, b) => (humorCountsPressao[a] > humorCountsPressao[b] ? a : b), ""
-  );
-  
-  const tonturaDias = pressaoData.filter((item) => item.Tontura).length;
+    const tonturaDias = pressaoData.filter((item) => item.Tontura).length;
 
-  const totalGlicemia = glicemiaData.reduce(
-    (acc, curr) => acc + parseInt(curr.Glicemia, 10),
-    0
-  );
-  const averageGlicemia = totalGlicemia / glicemiaData.length;
+    const totalGlicemia = glicemiaData.reduce(
+      (acc, curr) => acc + parseInt(curr.Glicemia, 10),
+      0
+    );
+    const averageGlicemia = totalGlicemia / glicemiaData.length;
 
-  const humorCountsGlicemia = glicemiaData.reduce((acc, curr) => {
-    acc[curr.Humor] = (acc[curr.Humor] || 0) + 1;
-    return acc;
-  }, {});
-  const mostFrequentHumorGlicemia = Object.keys(humorCountsGlicemia).reduce(
-    (a, b) => (humorCountsGlicemia[a] > humorCountsGlicemia[b] ? a : b),
-    ""
-  );
+    const humorCountsGlicemia = glicemiaData.reduce((acc, curr) => {
+      acc[curr.Humor] = (acc[curr.Humor] || 0) + 1;
+      return acc;
+    }, {});
+    const mostFrequentHumorGlicemia = Object.keys(humorCountsGlicemia).reduce(
+      (a, b) => (humorCountsGlicemia[a] > humorCountsGlicemia[b] ? a : b),
+      ""
+    );
 
-  const jejumDias = glicemiaData.filter((item) => item.Infasting).length;
+    const jejumDias = glicemiaData.filter((item) => item.Infasting).length;
 
-  // Atualizar os estados
-  setAverageSistolica(averageSistolica);
-  setAverageDiastolica(averageDiastolica);
-  setMostFrequentHumorPressao(mostFrequentHumorPressao);
-  setTonturaDias(tonturaDias);
-  setAverageGlicemia(averageGlicemia);
-  setMostFrequentHumorGlicemia(mostFrequentHumorGlicemia);
-  setJejumDias(jejumDias);
-}
+    // Atualizar os estados
+    setAverageSistolica(averageSistolica);
+    setAverageDiastolica(averageDiastolica);
+    setMostFrequentHumorPressao(mostFrequentHumorPressao);
+    setTonturaDias(tonturaDias);
+    setAverageGlicemia(averageGlicemia);
+    setMostFrequentHumorGlicemia(mostFrequentHumorGlicemia);
+    setJejumDias(jejumDias);
+  };
 
   useEffect(() => {
     if (pressaoData.length > 0) {
-      const totalSistolica = pressaoData.reduce((acc, curr) => acc + parseInt(curr.Sistolica, 10), 0);
+      const totalSistolica = pressaoData.reduce(
+        (acc, curr) => acc + parseInt(curr.Sistolica, 10),
+        0
+      );
       const averageSistolicaCalc = totalSistolica / pressaoData.length;
       setAverageSistolica(averageSistolicaCalc);
-  
-      const totalDiastolica = pressaoData.reduce((acc, curr) => acc + parseInt(curr.Diastolica, 10), 0);
+
+      const totalDiastolica = pressaoData.reduce(
+        (acc, curr) => acc + parseInt(curr.Diastolica, 10),
+        0
+      );
       const averageDiastolicaCalc = totalDiastolica / pressaoData.length;
       setAverageDiastolica(averageDiastolicaCalc);
-  
+
       const humorCounts = {};
-      pressaoData.forEach(item => {
+      pressaoData.forEach((item) => {
         humorCounts[item.Humor] = (humorCounts[item.Humor] || 0) + 1;
       });
-      const mostFrequent = Object.keys(humorCounts).reduce((a, b) => humorCounts[a] > humorCounts[b] ? a : b, "");
+      const mostFrequent = Object.keys(humorCounts).reduce(
+        (a, b) => (humorCounts[a] > humorCounts[b] ? a : b),
+        ""
+      );
       setMostFrequentHumorPressao(mostFrequent);
-  
-      const tonturaCount = pressaoData.filter(item => item.Tontura).length;
+
+      const tonturaCount = pressaoData.filter((item) => item.Tontura).length;
       setTonturaDias(tonturaCount);
     }
-  
+
     if (glicemiaData.length > 0) {
-      const totalGlicemia = glicemiaData.reduce((acc, curr) => acc + parseInt(curr.Glicemia, 10), 0);
+      const totalGlicemia = glicemiaData.reduce(
+        (acc, curr) => acc + parseInt(curr.Glicemia, 10),
+        0
+      );
       const averageGlicemiaCalc = totalGlicemia / glicemiaData.length;
       setAverageGlicemia(averageGlicemiaCalc);
-  
+
       const humorCountsGlicemia = {};
-      glicemiaData.forEach(item => {
-        humorCountsGlicemia[item.Humor] = (humorCountsGlicemia[item.Humor] || 0) + 1;
+      glicemiaData.forEach((item) => {
+        humorCountsGlicemia[item.Humor] =
+          (humorCountsGlicemia[item.Humor] || 0) + 1;
       });
-      const mostFrequentGlicemia = Object.keys(humorCountsGlicemia).reduce((a, b) => humorCountsGlicemia[a] > humorCountsGlicemia[b] ? a : b, "");
+      const mostFrequentGlicemia = Object.keys(humorCountsGlicemia).reduce(
+        (a, b) => (humorCountsGlicemia[a] > humorCountsGlicemia[b] ? a : b),
+        ""
+      );
       setMostFrequentHumorGlicemia(mostFrequentGlicemia);
-  
-      const jejumCount = glicemiaData.filter(item => item.Infasting).length;
+
+      const jejumCount = glicemiaData.filter((item) => item.Infasting).length;
       setJejumDias(jejumCount);
     }
   }, [pressaoData, glicemiaData]);
-  
+
   useEffect(() => {
     calculateStatistics();
   }, [pressaoData, glicemiaData]);
-  
 
   useEffect(() => {
     if (user && startDate && endDate) {
@@ -162,7 +183,9 @@ const calculateStatistics = () => {
       orderBy("DataHora", "desc")
     );
     const querySnapshot = await getDocs(q);
-    setPressaoData(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    setPressaoData(
+      querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+    );
   };
 
   const fetchGlicemia = async () => {
@@ -174,7 +197,9 @@ const calculateStatistics = () => {
       orderBy("Datetime", "desc")
     );
     const querySnapshot = await getDocs(q);
-    setGlicemiaData(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    setGlicemiaData(
+      querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+    );
   };
 
   const onChangeStartDate = (event, selectedDate) => {
@@ -197,21 +222,25 @@ const calculateStatistics = () => {
 
   const exportToExcel = async () => {
     const wb = XLSX.utils.book_new();
-    
+
     // Crie planilhas para os dados detalhados
-    const ws1 = XLSX.utils.json_to_sheet(pressaoData.map(data => ({
-      "Data/Hora": new Date(data.DataHora.seconds * 1000).toLocaleString(),
-      "Pressão Alta/Baixa": `${data.Sistolica}/${data.Diastolica}`,
-      "Humor": data.Humor,
-      "Tontura/Dor": data.Tontura ? "Sim" : "Não",
-    })));
-    const ws2 = XLSX.utils.json_to_sheet(glicemiaData.map(data => ({
-      "Data e Hora": new Date(data.Datetime.seconds * 1000).toLocaleString(),
-      "Glicemia": data.Glicemia,
-      "Em Jejum": data.Infasting ? "Sim" : "Não",
-      "Humor": data.Humor,
-    })));
-  
+    const ws1 = XLSX.utils.json_to_sheet(
+      pressaoData.map((data) => ({
+        "Data/Hora": new Date(data.DataHora.seconds * 1000).toLocaleString(),
+        "Pressão Alta/Baixa": `${data.Sistolica}/${data.Diastolica}`,
+        Humor: data.Humor,
+        "Tontura/Dor": data.Tontura ? "Sim" : "Não",
+      }))
+    );
+    const ws2 = XLSX.utils.json_to_sheet(
+      glicemiaData.map((data) => ({
+        "Data e Hora": new Date(data.Datetime.seconds * 1000).toLocaleString(),
+        Glicemia: data.Glicemia,
+        "Em Jejum": data.Infasting ? "Sim" : "Não",
+        Humor: data.Humor,
+      }))
+    );
+
     // Adicione resumos à planilha
     const summaryData = [
       ["Média de Pressão Arterial Sistólica", averageSistolica.toFixed(1)],
@@ -220,33 +249,45 @@ const calculateStatistics = () => {
       ["Dias com Tontura", tonturaDias],
       ["Média de Glicemia", averageGlicemia.toFixed(1)],
       ["Humor Mais Frequente (Glicemia)", mostFrequentHumorGlicemia],
-      ["Dias em Jejum", jejumDias]
+      ["Dias em Jejum", jejumDias],
     ];
     const ws3 = XLSX.utils.aoa_to_sheet(summaryData);
-    
+
     XLSX.utils.book_append_sheet(wb, ws1, "Pressão Arterial");
     XLSX.utils.book_append_sheet(wb, ws2, "Glicemia");
     XLSX.utils.book_append_sheet(wb, ws3, "Resumo de Saúde");
-    
-    const wbout = XLSX.write(wb, { type: 'base64', bookType: "xlsx" });
+
+    const wbout = XLSX.write(wb, { type: "base64", bookType: "xlsx" });
     const uri = `${FileSystem.cacheDirectory}dadosSaude.xlsx`;
-    await FileSystem.writeAsStringAsync(uri, wbout, { encoding: FileSystem.EncodingType.Base64 });
-  
+    await FileSystem.writeAsStringAsync(uri, wbout, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+
     try {
-      await Sharing.shareAsync(uri, { mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', dialogTitle: 'Compartilhar dados de saúde' });
-      Alert.alert('Exportação concluída', 'Arquivo Excel foi compartilhado com sucesso.');
+      await Sharing.shareAsync(uri, {
+        mimeType:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        dialogTitle: "Compartilhar dados de saúde",
+      });
+      Alert.alert(
+        "Exportação concluída",
+        "Arquivo Excel foi compartilhado com sucesso."
+      );
     } catch (error) {
-      console.error('Erro ao compartilhar o arquivo:', error);
-      Alert.alert('Erro de Exportação', 'Não foi possível compartilhar o arquivo.');
+      console.error("Erro ao compartilhar o arquivo:", error);
+      Alert.alert(
+        "Erro de Exportação",
+        "Não foi possível compartilhar o arquivo."
+      );
     }
   };
-  
-  
 
   const TableHeader = ({ headers }) => (
     <View style={styles.tableHeaderRow}>
       {headers.map((header, index) => (
-        <Text key={index} style={styles.tableHeaderCell}>{header}</Text>
+        <Text key={index} style={styles.tableHeaderCell}>
+          {header}
+        </Text>
       ))}
     </View>
   );
@@ -260,20 +301,22 @@ const calculateStatistics = () => {
         const sistolica = parseInt(item.Sistolica, 10);
         const diastolica = parseInt(item.Diastolica, 10);
         let backgroundColor = "#fff"; // Cor padrão
-  
+
         // Altera a cor de fundo se a pressão estiver alta ou baixa
         if (sistolica > 140 || diastolica > 90) {
           backgroundColor = "#ffcccc"; // Vermelho claro para pressão alta
         } else if (sistolica < 110 || diastolica < 60) {
           backgroundColor = "#ccccff"; // Azul claro para pressão baixa
         }
-  
+
         return (
           <View key={index} style={[styles.tableRow, { backgroundColor }]}>
             <Text style={styles.tableCell}>
               {new Date(item.DataHora.seconds * 1000).toLocaleString()}
             </Text>
-            <Text style={styles.tableCell}>{`${item.Sistolica}/${item.Diastolica}`}</Text>
+            <Text
+              style={styles.tableCell}
+            >{`${item.Sistolica}/${item.Diastolica}`}</Text>
             <Text style={styles.tableCell}>{item.Humor}</Text>
             <Text style={styles.tableCell}>{item.Tontura ? "Sim" : "Não"}</Text>
           </View>
@@ -281,10 +324,14 @@ const calculateStatistics = () => {
       })}
     </View>
   );
-  
+
   const calculateGlicemiaSummary = () => {
     if (!glicemiaData.length) {
-      return <Text style={styles.summaryText}>Carregando dados... ( Inserir data de inicial e Final)</Text>;
+      return (
+        <Text style={styles.summaryText}>
+          Carregando dados... ( Inserir data de inicial e Final)
+        </Text>
+      );
     }
 
     const totalGlicemia = glicemiaData.reduce(
@@ -321,13 +368,13 @@ const calculateStatistics = () => {
       <TableHeader headers={["Data e Hora", "Glicemia", "Em Jejum", "Humor"]} />
       {glicemiaData.map((item, index) => {
         let backgroundColor = "#fff"; // Cor padrão para linhas normais
-  
+
         if (item.Glicemia > 100) {
           backgroundColor = "#ffcccc"; // Vermelho claro para glicemia alta
         } else if (item.Glicemia < 70) {
           backgroundColor = "#ccccff"; // Azul claro para glicemia baixa
         }
-  
+
         return (
           <View key={index} style={[styles.tableRow, { backgroundColor }]}>
             <Text style={styles.tableCell}>
@@ -346,67 +393,105 @@ const calculateStatistics = () => {
   const calculateSummary = () => {
     if (!pressaoData.length) {
       return (
-        <Text style={styles.summaryText}>Carregando dados... (Inserir data de inicial e Final)</Text>
+        <Text style={styles.summaryText}>
+          Carregando dados... (Inserir data de inicial e Final)
+        </Text>
       );
     }
-  
-    const totalSistolica = pressaoData.reduce((acc, curr) => acc + parseInt(curr.Sistolica, 10), 0);
-    const totalDiastolica = pressaoData.reduce((acc, curr) => acc + parseInt(curr.Diastolica, 10), 0);
+
+    const totalSistolica = pressaoData.reduce(
+      (acc, curr) => acc + parseInt(curr.Sistolica, 10),
+      0
+    );
+    const totalDiastolica = pressaoData.reduce(
+      (acc, curr) => acc + parseInt(curr.Diastolica, 10),
+      0
+    );
     const averageSistolica = totalSistolica / pressaoData.length;
     const averageDiastolica = totalDiastolica / pressaoData.length;
-  
+
     const humorCounts = pressaoData.reduce((acc, curr) => {
       acc[curr.Humor] = (acc[curr.Humor] || 0) + 1;
       return acc;
     }, {});
     const mostFrequentHumor = Object.keys(humorCounts).reduce(
-      (a, b) => (humorCounts[a] > humorCounts[b] ? a : b), ""
+      (a, b) => (humorCounts[a] > humorCounts[b] ? a : b),
+      ""
     );
-  
+
     const tonturaDias = pressaoData.filter((item) => item.Tontura).length;
-  
+
     return (
       <Text style={styles.summaryText}>
         O usuário teve uma média de pressão{" "}
         <Text style={styles.boldText}>
           {averageSistolica.toFixed(1)}/{averageDiastolica.toFixed(1)}
-        </Text>
-        {" "}nesses 30 dias, seus humores variaram, porém ele ficou mais{" "}
-        <Text style={styles.boldText}>{mostFrequentHumor}</Text>{" "}e teve{" "}
-        <Text style={styles.boldText}>{tonturaDias}</Text>{" "}dias de dor e tontura.
+        </Text>{" "}
+        nesses 30 dias, seus humores variaram, porém ele ficou mais{" "}
+        <Text style={styles.boldText}>{mostFrequentHumor}</Text> e teve{" "}
+        <Text style={styles.boldText}>{tonturaDias}</Text> dias de dor e
+        tontura.
       </Text>
     );
   };
-  
+
   const SummarySection = () => (
-    <View style={styles.summarySection}>
-      {calculateSummary()}
-    </View>
+    <View style={styles.summarySection}>{calculateSummary()}</View>
   );
 
   const GlicemiaSummarySection = () => (
-    <View style={styles.summarySection}>
-      {calculateGlicemiaSummary()}
-    </View>
+    <View style={styles.summarySection}>{calculateGlicemiaSummary()}</View>
   );
   const renderDatePickers = () => (
     <View style={styles.datePickerContainer}>
       <View style={styles.dateInputWrapper}>
-        <TextInput style={styles.dateInput} value={startDate.toLocaleDateString()} editable={false} />
-        <TouchableOpacity style={styles.button} onPress={() => setShowStartDatePicker(true)}>
+        <TextInput
+          style={styles.dateInput}
+          value={startDate.toLocaleDateString()}
+          editable={false}
+        />
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => setShowStartDatePicker(true)}
+        >
           <Text style={styles.buttonText}>Escolher Data Inicial</Text>
         </TouchableOpacity>
         {showStartDatePicker && (
-          <DateTimePicker value={startDate} mode="date" display="default" onChange={onChangeStartDate} />
+          <DateTimePickerModal
+            isVisible={showStartDatePicker}
+            mode="date"
+            onConfirm={(date) => {
+              setStartDate(date);
+              setShowStartDatePicker(false);
+            }}
+            onCancel={() => setShowStartDatePicker(false)}
+            date={startDate}
+          />
         )}
       </View>
       <View style={styles.dateInputWrapper}>
-        <TextInput style={styles.dateInput} value={endDate.toLocaleDateString()} editable={false} />
-        <TouchableOpacity style={styles.button} onPress={() => setShowEndDatePicker(true)}>
+        <TextInput
+          style={styles.dateInput}
+          value={endDate.toLocaleDateString()}
+          editable={false}
+        />
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => setShowEndDatePicker(true)}
+        >
           <Text style={styles.buttonText}>Escolher Data Final</Text>
         </TouchableOpacity>
         {showEndDatePicker && (
-          <DateTimePicker value={endDate} mode="date" display="default" onChange={onChangeEndDate} />
+          <DateTimePickerModal
+            isVisible={showEndDatePicker}
+            mode="date"
+            onConfirm={(date) => {
+              setEndDate(date);
+              setShowEndDatePicker(false);
+            }}
+            onCancel={() => setShowEndDatePicker(false)}
+            date={endDate}
+          />
         )}
       </View>
     </View>
@@ -423,19 +508,23 @@ const calculateStatistics = () => {
     <View style={styles.legendContainer}>
       <Text style={styles.legendTitle}>Legenda de Cores:</Text>
       <View style={styles.legendItem}>
-        <View style={[styles.colorBox, { backgroundColor: '#ffcccc' }]} />
+        <View style={[styles.colorBox, { backgroundColor: "#ffcccc" }]} />
         <Text style={styles.legendText}>Pressão / Glicemia Alta</Text>
       </View>
       <View style={styles.legendItem}>
-        <View style={[styles.colorBox, { backgroundColor: '#ccccff' }]} />
+        <View style={[styles.colorBox, { backgroundColor: "#ccccff" }]} />
         <Text style={styles.legendText}>Pressão / Glicemia Baixa</Text>
       </View>
     </View>
   );
 
-
   return (
-    <ScrollView style={styles.container} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
       <Text style={styles.pageTitle}>Monitoramento de Saúde</Text>
       {renderDatePickers()}
       {renderExportButton()}
@@ -456,10 +545,10 @@ const calculateStatistics = () => {
 
 const styles = StyleSheet.create({
   legendContainer: {
-    backgroundColor: '#e8e8e8',
+    backgroundColor: "#e8e8e8",
     borderRadius: 10,
     padding: 10,
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 10, // Ensure separation from other elements
   },
   section: {
@@ -519,74 +608,74 @@ const styles = StyleSheet.create({
     marginTop: 20, // Adjust this value as needed for top margin
   },
   datePickerWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 10
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 10,
   },
   container: {
     flex: 1,
     padding: 10,
   },
   datePickerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginBottom: 10,
   },
   dateInputWrapper: {
-    width: '50%',
+    width: "50%",
     paddingRight: 5,
   },
   dateInput: {
     fontSize: 16,
     padding: 10,
     borderBottomWidth: 2,
-    borderColor: '#007BFF',
-    backgroundColor: '#FFF',
-    textAlign: 'center',
+    borderColor: "#007BFF",
+    backgroundColor: "#FFF",
+    textAlign: "center",
     marginBottom: 5,
   },
   button: {
-    backgroundColor: '#007BFF',
+    backgroundColor: "#007BFF",
     padding: 12,
     borderRadius: 20,
-    alignItems: 'center',
+    alignItems: "center",
   },
   buttonText: {
-    color: '#FFF',
+    color: "#FFF",
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   exportButton: {
-    backgroundColor: '#007BFF',
+    backgroundColor: "#007BFF",
     padding: 15,
     borderRadius: 25,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 10,
   },
   exportButtonText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginLeft: 10,
   },
   legendContainer: {
-    backgroundColor: '#e8e8e8',
+    backgroundColor: "#e8e8e8",
     borderRadius: 10,
     padding: 10,
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 10,
   },
   legendTitle: {
-    fontWeight: 'bold',
+    fontWeight: "bold",
     fontSize: 16,
     marginBottom: 5,
   },
   legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 5,
   },
   colorBox: {
@@ -599,10 +688,10 @@ const styles = StyleSheet.create({
   },
   pageTitle: {
     fontSize: 22,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 15,
-    textAlign: 'center',
+    textAlign: "center",
   },
 });
 
-export default InfoSaudePG;
+export default InfoSaudePG;
