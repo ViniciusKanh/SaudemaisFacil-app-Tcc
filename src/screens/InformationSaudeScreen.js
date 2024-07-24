@@ -141,11 +141,7 @@ const InformationSaudeScreen = () => {
         <Text style={styles.buttonText}>Informações de Saúde</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.button} onPress={handlePResumoPG}>
-        <Text style={styles.buttonText}>
-          Hitórico de Pressão Arterial e Glicemia
-        </Text>
-      </TouchableOpacity>
+  
 
       <TouchableOpacity style={styles.button} onPress={handlePressMedicamentos}>
         <Text style={styles.buttonText}>Medicamentos</Text>

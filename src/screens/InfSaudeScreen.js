@@ -267,29 +267,7 @@ const InfSaudeScreen = (props) => {
 >
       <View style={styles.summaryContainer}>
         <Text style={styles.summaryTitle}>Resumo</Text>
-        <View style={styles.summaryRow}>
-          <FontAwesome5 name="user-nurse" size={24} style={styles.iconStyle} />
-          <Text style={styles.summaryText}>
-            Doador de Órgãos: {userData.isOrganDonor ? "Sim" : "Não"}
-          </Text>
-        </View>
-        <View style={styles.summaryRow}>
-          <FontAwesome5 name="heartbeat" size={24} style={styles.iconStyle} />
-          <Text style={styles.summaryText}>
-            Hipertensão: {userData.hasHypertension ? "Sim" : "Não"}
-          </Text>
-        </View>
-        <View style={styles.summaryRow}>
-          <MaterialCommunityIcons
-            name="pill"
-            size={24}
-            style={styles.iconStyle}
-          />
-          <Text style={styles.summaryText}>
-            Medicação Controlada:{" "}
-            {userData.takesControlledMedication ? "Sim" : "Não"}
-          </Text>
-        </View>
+        
         <View style={styles.summaryRow}>
           <FontAwesome5 name="weight" size={24} style={styles.iconStyle} />
           <Text style={styles.summaryText}>
@@ -326,12 +304,14 @@ const InfSaudeScreen = (props) => {
         <TextInput
           style={styles.input}
           value={userData.height}
+          placeholder="Digite o valor em cm"
           onChangeText={(text) => handleTextChange(text, "height")}
         />
-        <Text style={styles.label}>Peso(KG)</Text>
+        <Text style={styles.label} >Peso(KG)</Text>
         <TextInput
           style={styles.input}
           value={userData.weight}
+          placeholder="Digite o valor cm um '.'"
           onChangeText={(text) => handleTextChange(text, "weight")}
         />
 
@@ -390,7 +370,7 @@ const pickerSelectStyles = StyleSheet.create({
     paddingHorizontal: 10,
     borderWidth: 1,
     borderColor: "gray",
-    borderRadius: 4,
+    borderRadius: 10,
     color: "black",
     paddingRight: 30,
   },
@@ -400,7 +380,7 @@ const pickerSelectStyles = StyleSheet.create({
     paddingVertical: 8,
     borderWidth: 0.5,
     borderColor: "purple",
-    borderRadius: 8,
+    borderRadius: 10,
     color: "black",
     paddingRight: 30, // para garantir que o texto não fique escondido atrás do ícone
   },
@@ -435,11 +415,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     marginTop: 20,
+    
   },
   input: {
     borderWidth: 1,
     borderColor: "gray",
-    borderRadius: 5,
+    borderRadius: 10,
     padding: 10,
     fontSize: 16,
   },

@@ -806,9 +806,10 @@ const renderMedication = ({ item }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "flex-start",
+    justifyContentustifyContent: "flex-start",
     backgroundColor: "#fff",
     paddingTop: 20,
+    //paddingRight: 10,
     alignItems: "center",
   },
   title: {
@@ -886,6 +887,7 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     textAlign: "center",
+    
   },
   scrollView: {
     backgroundColor: "white",
@@ -1147,9 +1149,9 @@ const styles = StyleSheet.create({
   },
   medicationCard: {
     flexDirection: "row",
-    width: "110%", // Deve ser 100% para preencher a largura da tela corretamente
+    width: "100%", // Deve ser 100% para preencher a largura da tela corretamente
     height: 120, // Altura fixa para todos os cartões
-    padding: 0, // Remover padding para que a imagem possa preencher todo o espaço
+    //padding: 10, // Remover padding para que a imagem possa preencher todo o espaço
     marginVertical: 10, // Espaçamento vertical entre os cartões
     backgroundColor: "#FFFFFF", // Fundo branco
     borderRadius: 10, // Bordas arredondadas

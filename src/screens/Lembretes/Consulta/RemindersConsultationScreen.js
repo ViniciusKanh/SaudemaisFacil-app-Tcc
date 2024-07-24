@@ -273,7 +273,7 @@ const RemindersConsultationScreen = ({ isVisible, onClose }) => {
               style={styles.input}
             />
             <TextInput
-              placeholder="Especialista"
+              placeholder="Doutor(a)"
               value={state.specialist}
               onChangeText={(text) =>
                 setState((prev) => ({ ...prev, specialist: text }))
