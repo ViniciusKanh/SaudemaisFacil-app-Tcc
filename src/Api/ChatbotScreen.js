@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { db } from '../config/firebaseConfig';
 import { collection, addDoc, onSnapshot, query, orderBy, limit, where } from "firebase/firestore";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
@@ -10,6 +10,7 @@ const ChatbotScreen = () => {
   const [input, setInput] = useState('');
   const [latestMessage, setLatestMessage] = useState(null);
   const [isCollapsed, setIsCollapsed] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const q = query(collection(db, "generate"), where("response", "!=", null), orderBy("createTime", "desc"), limit(1));
@@ -28,11 +29,17 @@ const ChatbotScreen = () => {
 
   const sendPrompt = async () => {
     if (input.trim() === '') return;
-    await addDoc(collection(db, "generate"), {
-      prompt: input,
-      createTime: new Date()
-    });
-    setInput('');
+    setLoading(true);
+    try {
+      await addDoc(collection(db, "generate"), {
+        prompt: input,
+        createTime: new Date()
+      });
+      setInput('');
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível enviar a pergunta.');
+    }
+    setLoading(false);
   };
 
   const toggleCollapse = () => {
@@ -41,57 +48,55 @@ const ChatbotScreen = () => {
 
   return (
     <ScrollView>
-
-    <KeyboardAwareScrollView style={{ flex: 1 }} resetScrollToCoords={{ x: 0, y: 0 }} contentContainerStyle={styles.container}>
-      <View style={styles.introContainer}>
-        <Text style={styles.introHeader}>Bem-vindo ao Chatbot IA do Saúde+Facil!</Text>
-        <Text style={styles.introText}>
-          Este chatbot está aqui para ajudar com dúvidas sobre <Text style={styles.boldText}>conceitos médicos</Text> e 
-          informações relacionadas ao uso do aplicativo. Faça perguntas como:
-        </Text>
-        <Text style={styles.exampleQuestion}>
-          - "O que é uma receita genérica amarela?"
-        </Text>
-        <Text style={styles.exampleQuestion}>
-          - "O que significa concentração de um medicamento?"
-        </Text>
-        <Text style={styles.exampleQuestion}>
-          - "Quais são os valores considerados altos para pressão arterial e glicose?"
-        </Text>
-        <Text style={styles.introText}>
-          Para questões sobre <Text style={styles.boldText}>funcionalidades específicas</Text> do aplicativo, como criar lembretes ou atualizar informações, 
-          por favor, acesse <Text style={styles.italicText}>Perfil -{'>'} Dúvidas</Text>.
-        </Text>
-      </View>
-      <Text style={styles.label}>Escreva sua Pergunta:</Text>
-      <TextInput
-        style={styles.input}
-        onChangeText={setInput}
-        value={input}
-        placeholder="Digite sua mensagem..."
-      />
-      <TouchableOpacity style={styles.button} onPress={sendPrompt}>
-        <Text style={styles.buttonText}>Enviar</Text>
-      </TouchableOpacity>
-      {latestMessage && (
-        <View style={styles.responseContainer}>
-          <ScrollView style={styles.responseContainer}>
-          <TouchableOpacity style={styles.questionButton} onPress={toggleCollapse}>
-            <Text style={styles.messageText}>Última pergunta: {latestMessage.prompt}</Text>
-          </TouchableOpacity>
-          <Collapsible collapsed={isCollapsed}>
-            <Markdown style={markdownStyles}>
-              {latestMessage.response || 'Aguardando resposta...'}
-            </Markdown>
-          </Collapsible>
-          </ScrollView>
+      <KeyboardAwareScrollView style={{ flex: 1 }} resetScrollToCoords={{ x: 0, y: 0 }} contentContainerStyle={styles.container}>
+        <View style={styles.introContainer}>
+          <Text style={styles.introHeader}>Bem-vindo ao Chatbot IA do Saúde+Facil!</Text>
+          <Text style={styles.introText}>
+            Este chatbot está aqui para ajudar com dúvidas sobre <Text style={styles.boldText}>conceitos médicos</Text> e 
+            informações relacionadas ao uso do aplicativo. Faça perguntas como:
+          </Text>
+          <Text style={styles.exampleQuestion}>
+            - "O que é uma receita genérica amarela?"
+          </Text>
+          <Text style={styles.exampleQuestion}>
+            - "O que significa concentração de um medicamento?"
+          </Text>
+          <Text style={styles.exampleQuestion}>
+            - "Quais são os valores considerados altos para pressão arterial e glicose?"
+          </Text>
+          <Text style={styles.introText}>
+            Para questões sobre <Text style={styles.boldText}>funcionalidades específicas</Text> do aplicativo, como criar lembretes ou atualizar informações, 
+            por favor, acesse <Text style={styles.italicText}>Perfil -{'>'} Dúvidas</Text>.
+          </Text>
         </View>
-      )}
-    </KeyboardAwareScrollView>
-     </ScrollView>
+        <Text style={styles.label}>Escreva sua Pergunta:</Text>
+        <TextInput
+          style={styles.input}
+          onChangeText={setInput}
+          value={input}
+          placeholder="Digite sua mensagem..."
+        />
+        <TouchableOpacity style={styles.button} onPress={sendPrompt} disabled={loading}>
+          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Enviar</Text>}
+        </TouchableOpacity>
+        {latestMessage && (
+          <View style={styles.responseContainer}>
+            <ScrollView style={styles.responseContainer}>
+              <TouchableOpacity style={styles.questionButton} onPress={toggleCollapse}>
+                <Text style={styles.messageText}>Última pergunta: {latestMessage.prompt}</Text>
+              </TouchableOpacity>
+              <Collapsible collapsed={isCollapsed}>
+                <Markdown style={markdownStyles}>
+                  {latestMessage.response || 'Aguardando resposta...'}
+                </Markdown>
+              </Collapsible>
+            </ScrollView>
+          </View>
+        )}
+      </KeyboardAwareScrollView>
+    </ScrollView>
   );
 };
-
 
 const styles = StyleSheet.create({
   container: {
@@ -178,7 +183,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10
   },
-  
 });
 
 const markdownStyles = {

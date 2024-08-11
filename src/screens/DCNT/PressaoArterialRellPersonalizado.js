@@ -1,4 +1,3 @@
-//PressaoArterialRellPersonalizado.js
 import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
@@ -68,7 +67,6 @@ const PressaoArterialMonitoramento = () => {
 
     const tonturaDias = pressaoData.filter((item) => item.Tontura).length;
 
-    // Atualizar os estados
     setAverageSistolica(averageSistolica);
     setAverageDiastolica(averageDiastolica);
     setMostFrequentHumorPressao(mostFrequentHumorPressao);
@@ -136,11 +134,18 @@ const PressaoArterialMonitoramento = () => {
   }, [user, startDate, endDate]);
 
   const fetchPressaoArterial = async () => {
+    const startTimestamp = Timestamp.fromDate(
+      new Date(startDate.setHours(0, 0, 0, 0))
+    );
+    const endTimestamp = Timestamp.fromDate(
+      new Date(endDate.setHours(23, 59, 59, 999))
+    );
+
     const q = query(
       collection(db, "pressaoArterial"),
       where("UsuarioID", "==", user.uid),
-      where("DataHora", ">=", startDate),
-      where("DataHora", "<=", endDate),
+      where("DataHora", ">=", startTimestamp),
+      where("DataHora", "<=", endTimestamp),
       orderBy("DataHora", "desc")
     );
     const querySnapshot = await getDocs(q);
@@ -154,28 +159,23 @@ const PressaoArterialMonitoramento = () => {
     setTotalPages(Math.ceil(data.length / recordsPerPage));
   };
 
-  const onChangeStartDate = (event, selectedDate) => {
-    setShowStartDatePicker(false);
-    if (selectedDate) {
-      setStartDate(selectedDate);
-    } else {
-      setStartDate(new Date()); // Garante que sempre haverá uma data válida
-    }
-  };
-
-  const onChangeEndDate = (event, selectedDate) => {
-    setShowEndDatePicker(false);
-    if (selectedDate) {
-      setEndDate(selectedDate);
-    } else {
-      setEndDate(new Date());
+  const handleDateChange = (type, selectedDate) => {
+    if (type === 'start') {
+      setShowStartDatePicker(false);
+      if (selectedDate) {
+        setStartDate(selectedDate);
+      }
+    } else if (type === 'end') {
+      setShowEndDatePicker(false);
+      if (selectedDate) {
+        setEndDate(selectedDate);
+      }
     }
   };
 
   const exportToExcel = async () => {
     const wb = XLSX.utils.book_new();
 
-    // Crie planilhas para os dados detalhados
     const ws1 = XLSX.utils.json_to_sheet(
       pressaoData.map((data) => ({
         "Data/Hora": new Date(data.DataHora.seconds * 1000).toLocaleString(),
@@ -185,7 +185,6 @@ const PressaoArterialMonitoramento = () => {
       }))
     );
 
-    // Adicione resumos à planilha
     const summaryData = [
       ["Média de Pressão Arterial Sistólica", averageSistolica.toFixed(1)],
       ["Média de Pressão Arterial Diastólica", averageDiastolica.toFixed(1)],
@@ -292,11 +291,11 @@ const PressaoArterialMonitoramento = () => {
     const sistolica = parseInt(item.Sistolica, 10);
     const diastolica = parseInt(item.Diastolica, 10);
     if (sistolica > 140 || diastolica > 90) {
-      return "#ffcccc"; // Vermelho claro para pressão alta
+      return "#ffcccc";
     } else if (sistolica < 110 || diastolica < 60) {
-      return "#ccccff"; // Azul claro para pressão baixa
+      return "#ccccff";
     }
-    return "#fff"; // Cor padrão
+    return "#fff";
   };
 
   const calculateSummary = () => {
@@ -366,12 +365,10 @@ const PressaoArterialMonitoramento = () => {
           <DateTimePickerModal
             isVisible={showStartDatePicker}
             mode="date"
-            onConfirm={(date) => {
-              setStartDate(date);
-              setShowStartDatePicker(false);
-            }}
+            onConfirm={(date) => handleDateChange('start', date)}
             onCancel={() => setShowStartDatePicker(false)}
             date={startDate}
+            textColor="black"
           />
         )}
       </View>
@@ -391,12 +388,10 @@ const PressaoArterialMonitoramento = () => {
           <DateTimePickerModal
             isVisible={showEndDatePicker}
             mode="date"
-            onConfirm={(date) => {
-              setEndDate(date);
-              setShowEndDatePicker(false);
-            }}
+            onConfirm={(date) => handleDateChange('end', date)}
             onCancel={() => setShowEndDatePicker(false)}
             date={endDate}
+            textColor="black"
           />
         )}
       </View>
@@ -443,8 +438,6 @@ const PressaoArterialMonitoramento = () => {
     </ScrollView>
   );
 };
-
-// Styles
 
 const styles = StyleSheet.create({
   legendContainer: {

@@ -394,28 +394,10 @@ export default function AppNavigator() {
           <View style={styles.modalView}>
             <Text style={styles.modalTitle}>Escolha uma Opção</Text>
             <TouchableOpacity
-              style={styles.buttonStyle}
-              onPress={() => navigateToScreen("Perfil")}
-            >
-              <Text style={styles.buttonText}>Dados Pessoais</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.buttonStyle}
-              onPress={() => navigateToScreen("Informações Saúde")}
-            >
-              <Text style={styles.buttonText}>Informações de Saúde</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.buttonStyle}
-              onPress={() => navigateToScreen("Medicamentos")}
-            >
-              <Text style={styles.buttonText}>Gestão de Medicamentos</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
               style={[styles.buttonStyle, styles.logoutButton]}
               onPress={handleLogout}
             >
-              <Text style={styles.buttonText}>Logout</Text>
+              <Text style={styles.buttonText}>Sair</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.buttonStyle, styles.cancelButton]}

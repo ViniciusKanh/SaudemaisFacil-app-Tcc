@@ -1,4 +1,3 @@
-// RemindersConsultationScreen.js
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -6,12 +5,9 @@ import {
   Modal,
   StyleSheet,
   TextInput,
-  Platform,
   TouchableOpacity,
   ScrollView,
-  KeyboardAvoidingView,
-  Button,
-  Keyboard,
+  Alert,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { db } from "../../../config/firebaseConfig";
@@ -31,7 +27,6 @@ const initialState = {
   isDatePickerVisible: false,
   isTimePickerVisible: false,
   typeOptions: [],
-  keyboardPadding: 0,
 };
 
 const RemindersConsultationScreen = ({ isVisible, onClose }) => {
@@ -43,59 +38,48 @@ const RemindersConsultationScreen = ({ isVisible, onClose }) => {
     if (isVisible) {
       fetchTypeConsultation();
     }
-    const keyboardDidShowListener = Keyboard.addListener(
-      "keyboardDidShow",
-      (e) =>
-        setState((prev) => ({
-          ...prev,
-          keyboardPadding: e.endCoordinates.height,
-        }))
-    );
-    const keyboardDidHideListener = Keyboard.addListener(
-      "keyboardDidHide",
-      () => setState((prev) => ({ ...prev, keyboardPadding: 0 }))
-    );
-
-    return () => {
-      keyboardDidShowListener.remove();
-      keyboardDidHideListener.remove();
-    };
   }, [isVisible]);
-
-  useEffect(() => {
-    const subscription = Notifications.addNotificationReceivedListener(
-      (notification) => {
-        console.log("Notificação recebida:", notification);
-      }
-    );
-
-    return () => subscription.remove();
-  }, []);
 
   const fetchTypeConsultation = async () => {
     const querySnapshot = await getDocs(collection(db, "TypeConsultation"));
     const fetchedTypes = querySnapshot.docs.map((doc) => ({
       id: doc.id,
-      name: doc.data().type, // Certifique-se de que 'name' é o campo correto no seu documento
+      name: doc.data().type,
     }));
     setState((prev) => ({ ...prev, typeOptions: fetchedTypes }));
   };
 
+  const showDatePicker = () => {
+    setState((prev) => ({ ...prev, isDatePickerVisible: true }));
+  };
+
+  const hideDatePicker = () => {
+    setState((prev) => ({ ...prev, isDatePickerVisible: false }));
+  };
+
   const handleConfirmDate = (selectedDate) => {
-    const currentDate = selectedDate || state.date;
     setState((prev) => ({
       ...prev,
-      date: currentDate,
+      date: selectedDate,
       isDatePickerVisible: false,
     }));
   };
 
+  const showTimePicker = () => {
+    setState((prev) => ({ ...prev, isTimePickerVisible: true }));
+  };
+
+  const hideTimePicker = () => {
+    setState((prev) => ({ ...prev, isTimePickerVisible: false }));
+  };
+
   const handleConfirmTime = (selectedTime) => {
-    const newDate = new Date(state.date);
-    newDate.setHours(selectedTime.getHours(), selectedTime.getMinutes());
+    const currentDate = new Date(state.date);
+    currentDate.setHours(selectedTime.getHours());
+    currentDate.setMinutes(selectedTime.getMinutes());
     setState((prev) => ({
       ...prev,
-      date: newDate,
+      date: currentDate,
       isTimePickerVisible: false,
     }));
   };
@@ -110,9 +94,7 @@ const RemindersConsultationScreen = ({ isVisible, onClose }) => {
     if (!permission.granted) {
       const newPermission = await Notifications.requestPermissionsAsync();
       if (!newPermission.granted) {
-        alert(
-          "Permissão de notificação negada. O lembrete não poderá ser notificado."
-        );
+        alert("Permissão de notificação negada. O lembrete não poderá ser notificado.");
         return;
       }
     }
@@ -133,35 +115,27 @@ const RemindersConsultationScreen = ({ isVisible, onClose }) => {
         deviceToken: deviceToken,
       });
 
-      // Agendar a notificação com a antecedência configurada
-      const notificationTime = new Date(formattedDateTime);
-      notificationTime.setHours(
-        notificationTime.getHours() - state.warningHours
-      );
+      const notificationTime = new Date(state.date);
+      notificationTime.setHours(notificationTime.getHours() - state.warningHours);
 
       if (notificationTime > new Date()) {
-        const scheduledNotification =
-          await Notifications.scheduleNotificationAsync({
-            content: {
-              title: "Lembrete de Consulta",
-              body: `Sua consulta com ${state.specialist} em ${
-                state.location
-              } está agendada para ${formatDateDisplay(notificationTime)}`,
-              sound: "default",
-            },
-            trigger: notificationTime,
-          });
+        const scheduledNotification = await Notifications.scheduleNotificationAsync({
+          content: {
+            title: "Lembrete de Consulta",
+            body: `Sua consulta com ${state.specialist} em ${state.location} está agendada para ${formatDateDisplay(state.date)}. Notificação com ${state.warningHours} horas de antecedência.`,
+            sound: "default",
+          },
+          trigger: notificationTime,
+        });
 
         console.log("Notificação agendada:", scheduledNotification);
         alert("Lembrete salvo e notificação agendada com sucesso!");
       } else {
-        alert(
-          "A data e hora do lembrete já passaram, ajuste para um momento futuro."
-        );
+        alert("A data e hora do lembrete já passaram, ajuste para um momento futuro.");
       }
 
-      resetForm(); // Função para resetar o formulário
-      onClose(); // Fechando o modal após o salvamento
+      resetForm();
+      onClose();
     } catch (error) {
       console.error("Erro ao salvar lembrete: ", error);
       alert("Erro ao salvar lembrete.");
@@ -182,31 +156,21 @@ const RemindersConsultationScreen = ({ isVisible, onClose }) => {
   const resetForm = () => {
     setState({
       ...initialState,
-      date: new Date(), // Mantém a data atualizada
-      typeOptions: state.typeOptions, // Mantém as opções carregadas para tipo de consulta
+      date: new Date(),
+      typeOptions: state.typeOptions,
     });
   };
 
-
   return (
-    <Modal
-      animationType="slide"
-      transparent={true}
-      visible={isVisible}
-      onRequestClose={onClose}
-    >
+    <Modal animationType="slide" transparent={true} visible={isVisible} onRequestClose={onClose}>
       <KeyboardAwareScrollView extraScrollHeight={20}>
         <View style={styles.modalView}>
-          <ScrollView
-            contentContainerStyle={{ paddingBottom: state.keyboardPadding }}
-          >
+          <ScrollView contentContainerStyle={styles.scrollViewContent}>
             <Text style={styles.modalTitle}>Adicionar Novo Lembrete</Text>
             <Picker
               selectedValue={state.typeConsultation.id}
               onValueChange={(itemValue) => {
-                const selectedType = state.typeOptions.find(
-                  (option) => option.id === itemValue
-                );
+                const selectedType = state.typeOptions.find((option) => option.id === itemValue);
                 setState((prev) => ({
                   ...prev,
                   typeConsultation: { id: itemValue, name: selectedType.name },
@@ -215,83 +179,64 @@ const RemindersConsultationScreen = ({ isVisible, onClose }) => {
               style={styles.picker}
             >
               {state.typeOptions.map((option) => (
-                <Picker.Item
-                  key={option.id}
-                  label={option.name}
-                  value={option.id}
-                />
+                <Picker.Item key={option.id} label={option.name} value={option.id} />
               ))}
             </Picker>
-            <Button
-              title="Escolher Data"
-              onPress={() =>
-                setState((prev) => ({ ...prev, isDatePickerVisible: true }))
-              }
-            />
-            <Button
-              title="Escolher Hora"
-              onPress={() =>
-                setState((prev) => ({ ...prev, isTimePickerVisible: true }))
-              }
-            />
-            <Text style={styles.dateDisplay}>
-              {formatDateDisplay(state.date)}
-            </Text>
+            <View style={styles.dateTimeWrapper}>
+              <TouchableOpacity onPress={showDatePicker} style={styles.dateTimeButton}>
+                <Text style={styles.dateTimeText}>Escolher Data</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={showTimePicker} style={styles.dateTimeButton}>
+                <Text style={styles.dateTimeText}>Escolher Hora</Text>
+              </TouchableOpacity>
+            </View>
+
             <DateTimePickerModal
               isVisible={state.isDatePickerVisible}
               mode="date"
               onConfirm={handleConfirmDate}
-              onCancel={() =>
-                setState((prev) => ({ ...prev, isDatePickerVisible: false }))
-              }
+              onCancel={hideDatePicker}
               date={state.date}
+              textColor="black"
             />
+
             <DateTimePickerModal
               isVisible={state.isTimePickerVisible}
               mode="time"
               onConfirm={handleConfirmTime}
-              onCancel={() =>
-                setState((prev) => ({ ...prev, isTimePickerVisible: false }))
-              }
+              onCancel={hideTimePicker}
               date={state.date}
+              textColor="black"
             />
+
+            <Text style={styles.dateDisplay}>{formatDateDisplay(state.date)}</Text>
+
             <TextInput
               placeholder="Horas de aviso"
               value={state.warningHours.toString()}
-              onChangeText={(text) =>
-                setState((prev) => ({ ...prev, warningHours: Number(text) }))
-              }
+              onChangeText={(text) => setState((prev) => ({ ...prev, warningHours: Number(text) }))}
               style={styles.input}
               keyboardType="numeric"
             />
             <TextInput
               placeholder="Local"
               value={state.location}
-              onChangeText={(text) =>
-                setState((prev) => ({ ...prev, location: text }))
-              }
+              onChangeText={(text) => setState((prev) => ({ ...prev, location: text }))}
               style={styles.input}
             />
             <TextInput
               placeholder="Doutor(a)"
               value={state.specialist}
-              onChangeText={(text) =>
-                setState((prev) => ({ ...prev, specialist: text }))
-              }
+              onChangeText={(text) => setState((prev) => ({ ...prev, specialist: text }))}
               style={styles.input}
             />
             <TextInput
               placeholder="Especialidade"
               value={state.specialty}
-              onChangeText={(text) =>
-                setState((prev) => ({ ...prev, specialty: text }))
-              }
+              onChangeText={(text) => setState((prev) => ({ ...prev, specialty: text }))}
               style={styles.input}
             />
-            <TouchableOpacity
-              style={styles.buttonSalvar}
-              onPress={handleSaveReminder}
-            >
+            <TouchableOpacity style={styles.buttonSalvar} onPress={handleSaveReminder}>
               <Text style={styles.buttonTextSalvar}>Salvar</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.buttonClose} onPress={onClose}>
@@ -305,26 +250,6 @@ const RemindersConsultationScreen = ({ isVisible, onClose }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  dateDisplay: {
-    fontSize: 16,
-    color: "#333",
-    marginTop: 20,
-  },
-  button: {
-    backgroundColor: "#007bff",
-    padding: 10,
-    borderRadius: 5,
-    marginTop: 20,
-  },
-  buttonText: {
-    color: "white",
-  },
   modalView: {
     margin: 26,
     backgroundColor: "white",
@@ -341,16 +266,41 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   modalTitle: {
-    marginBottom: -40,
+    marginBottom: 20,
     textAlign: "center",
     fontSize: 18,
     fontWeight: "bold",
   },
   picker: {
     width: "100%",
-    marginBottom: -20,
+    marginBottom: 20,
   },
-
+  dateTimeWrapper: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+    marginBottom: 20,
+  },
+  dateTimeButton: {
+    backgroundColor: "#007bff",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+    marginBottom: 10,
+    width: "48%",
+    alignItems: "center",
+  },
+  dateTimeText: {
+    color: "white",
+    fontSize: 16,
+  },
+  dateDisplay: {
+    fontSize: 16,
+    color: "#333",
+    marginTop: 20,
+    marginBottom: 20,
+    textAlign: "center",
+  },
   input: {
     width: "100%",
     padding: 10,
@@ -359,17 +309,6 @@ const styles = StyleSheet.create({
     borderColor: "#ccc",
     borderRadius: 5,
   },
-  saveButton: {
-    backgroundColor: "#28a745",
-    padding: 10,
-    borderRadius: 5,
-    marginVertical: 5,
-  },
-  saveButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    textAlign: "center",
-  },
   buttonSalvar: {
     backgroundColor: "#34A853",
     borderRadius: 20,
@@ -377,6 +316,7 @@ const styles = StyleSheet.create({
     elevation: 2,
     minWidth: "100%",
     marginTop: 10,
+    alignItems: "center",
   },
   buttonTextSalvar: {
     color: "white",
@@ -391,37 +331,13 @@ const styles = StyleSheet.create({
     elevation: 2,
     minWidth: "100%",
     marginTop: 10,
+    alignItems: "center",
   },
   buttonTextClose: {
     color: "white",
     fontWeight: "bold",
     textAlign: "center",
     fontSize: 18,
-  },
-  dateTimeWrapper: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginVertical: 20, // Espaçamento vertical entre este elemento e os outros
-    width: "100%", // Ocupa toda a largura disponível
-  },
-  dateTimeContainer: {
-    alignItems: "center",
-    flex: 1, // Faz com que cada container ocupe metade da largura disponível
-  },
-  dateButton: {
-    backgroundColor: "#007bff",
-    padding: 10,
-    borderRadius: 10,
-    marginBottom: 10, // Espaçamento entre o botão e o texto
-  },
-  dateTimeText: {
-    color: "#007bff",
-    fontSize: 16,
-  },
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "bold",
   },
 });
 

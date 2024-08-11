@@ -29,8 +29,8 @@ if (getApps().length === 0) {
   });
 
   // Log the Firebase App and Auth instances to ensure they are initialized correctly
-  console.log("Firebase App instance:", app);
-  console.log("Firebase Auth instance:", auth);
+  //console.log("Firebase App instance:", app);
+  //console.log("Firebase Auth instance:", auth);
 }
 
 export { db, auth, storage, app };

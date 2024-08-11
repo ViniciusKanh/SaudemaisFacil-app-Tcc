@@ -188,6 +188,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     marginBottom: 10,
+    width: 150,
   },
   registerButton: {
     backgroundColor: "#4CAF50",

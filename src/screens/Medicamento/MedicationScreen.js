@@ -29,7 +29,7 @@ import Markdown from "react-native-markdown-display";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import firebase from "firebase/app";
 import { db, storage } from "../../config/firebaseConfig"; // Ajuste para o caminho correto do seu arquivo de configuração
-import { collection, addDoc, query, where, getDocs } from "firebase/firestore";
+import { collection, addDoc, query, where, getDocs, doc, deleteDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 
@@ -204,8 +204,8 @@ const MedicationScreen = () => {
     setCurrentStep(1); // Muda para a tela de adição de medicamento
   };
 
-   // Função para exibir opções ao clicar no cartão
-   const handleSelectCard = (id) => {
+  // Função para exibir opções ao clicar no cartão
+  const handleSelectCard = (id) => {
     if (selectedId === id) {
       setSelectedId(null); // Se já está selecionado, fecha ao clicar novamente
     } else {
@@ -219,53 +219,64 @@ const MedicationScreen = () => {
   };
 
   const confirmDelete = async (id) => {
-    // Implementação da exclusão aqui
-    alert("Medicamento excluído com sucesso!");
-    // Recarrega os dados após exclusão
-    loadMedications();
+    try {
+      // Referência ao documento do medicamento no Firestore
+      const medicationRef = doc(db, "medications", id);
+      // Deleta o documento
+      await deleteDoc(medicationRef);
+      // Filtra o medicamento excluído da lista local
+      setMedications((prevMedications) =>
+        prevMedications.filter((medication) => medication.id !== id)
+      );
+      alert("Medicamento excluído com sucesso!");
+    } catch (error) {
+      console.error("Erro ao excluir o medicamento:", error);
+      alert("Erro ao excluir o medicamento.");
+    }
   };
+  
 
-// No topo do arquivo, garanta que você tenha importado os ícones adequados e as cores.
+  // No topo do arquivo, garanta que você tenha importado os ícones adequados e as cores.
 
-const renderMedication = ({ item }) => {
-  // Resolve the icon component based on the medication form
-  const MedicationIcon = IconComponents[item.form];
-
-  return (
-    <View>
-      <TouchableOpacity style={styles.medicationCard} onPress={() => handleSelectCard(item.id)}>
-        <Image source={{ uri: item.imageUrl }} style={styles.medicationImage} />
-        <View style={styles.medicationInfo}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: 10,padding:5 }}>
-           
-            <View style={{ flex: 1 }}>
-              <Text style={styles.medicationName}>{item.name}</Text>
-              <Text style={styles.medicationDetails}>
-                Dosagem: {item.dosage}, Tipo: {item.type}
-              </Text>
-              
+  const renderMedication = ({ item }) => {
+    // Resolve the icon component based on the medication form
+    const MedicationIcon = IconComponents[item.form];
+  
+    return (
+      <View>
+        <TouchableOpacity style={styles.medicationCard} onPress={() => handleSelectCard(item.id)}>
+          <Image source={{ uri: item.imageUrl }} style={styles.medicationImage} />
+          <View style={styles.medicationInfo}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: 10,padding:5 }}>
+             
+              <View style={{ flex: 1 }}>
+                <Text style={styles.medicationName}>{item.name}</Text>
+                <Text style={styles.medicationDetails}>
+                  Dosagem: {item.dosage}, Tipo: {item.type}
+                </Text>
+                
+              </View>
+              {MedicationIcon && (
+                <MedicationIcon color={item.color} size={50} style={{ marginRight: 10 }} />
+              )}
             </View>
-            {MedicationIcon && (
-              <MedicationIcon color={item.color} size={50} style={{ marginRight: 10 }} />
-            )}
           </View>
-        </View>
-      </TouchableOpacity>
-      {selectedId === item.id && (
-        <View style={styles.actionButtonsContainer}>
-          <TouchableOpacity style={styles.editButton} onPress={() => openEditModal(item)}>
-            <MaterialIcons name="edit" size={24} color="white" />
-            <Text style={styles.actionButtonText}>Editar</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.deleteButton} onPress={() => confirmDelete(item.id)}>
-            <MaterialIcons name="delete" size={24} color="white" />
-            <Text style={styles.actionButtonText}>Excluir</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
-  );
-};
+        </TouchableOpacity>
+        {selectedId === item.id && (
+          <View style={styles.actionButtonsContainer}>
+            <TouchableOpacity style={styles.editButton} onPress={() => openEditModal(item)}>
+              <MaterialIcons name="edit" size={24} color="white" />
+              <Text style={styles.actionButtonText}>Editar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.deleteButton} onPress={() => confirmDelete(item.id)}>
+              <MaterialIcons name="delete" size={24} color="white" />
+              <Text style={styles.actionButtonText}>Excluir</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    );
+  };
 
 
 
@@ -329,20 +340,20 @@ const renderMedication = ({ item }) => {
     <View style={styles.container}>
       {currentStep === 0 && (
         <FlatList
-        data={medications}
-        renderItem={renderMedication}
-        keyExtractor={(item) => item.id.toString()}
-        ListHeaderComponent={
-          <TouchableOpacity style={styles.addButton} onPress={() => setCurrentStep(1)}>
-            <Text style={styles.addButtonText}>Adicionar Medicamento</Text>
-          </TouchableOpacity>
-        }
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadMedications} />}
+          data={medications}
+          renderItem={renderMedication}
+          keyExtractor={(item) => item.id.toString()}
+          ListHeaderComponent={
+            <TouchableOpacity style={styles.addButton} onPress={() => setCurrentStep(1)}>
+              <Text style={styles.addButtonText}>Adicionar Medicamento</Text>
+            </TouchableOpacity>
+          }
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadMedications} />}
 
-          contentContainerStyle={{ 
+          contentContainerStyle={{
             paddingBottom: 1, // Espaço extra na parte inferior
             paddingHorizontal: 30, // Adiciona espaçamento horizontal
-          }}          style={{ width: "90%" }} // Garante que o FlatList ocupe toda a largura disponível
+          }} style={{ width: "90%" }} // Garante que o FlatList ocupe toda a largura disponível
         />
       )}
       {currentStep === 1 && (
@@ -486,7 +497,7 @@ const renderMedication = ({ item }) => {
                   style={[
                     styles.button,
                     !(medicationDosage && TypemedicationDosage) &&
-                      styles.buttonDisabled,
+                    styles.buttonDisabled,
                   ]}
                   onPress={handleNext}
                   disabled={!(medicationDosage && TypemedicationDosage)}
@@ -506,89 +517,92 @@ const renderMedication = ({ item }) => {
       )}
 
       {currentStep === 4 && (
-        <View style={styles.container}>
-          <Image
-            source={require("../assets/icons/forms.png")}
-            style={styles.logo}
-          />
-          <View style={styles.header}>
-            <Text style={styles.medicationLabel}>
-              {medicationName} - {medicationType}, {medicationDosage}{" "}
-              {TypemedicationDosage}, {medicationForm}
-            </Text>
-            <Text style={styles.headerText}>Escolha a Forma</Text>
-          </View>
-          <View style={styles.gridContainer}>
-            <TouchableOpacity
-              style={styles.gridItem}
-              onPress={() => handleFormSelection("Capsule")}
-            >
-              <CapsuleIcon color="#007bff" size={50} />
-              <Text style={styles.gridLabel}>Cápsula</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.gridItem}
-              onPress={() => setMedicationForm("Pill")}
-            >
-              <PillIcon color="#007bff" size={50} />
+        <ScrollView>
+          <View style={styles.container}>
+            <Image
+              source={require("../assets/icons/forms.png")}
+              style={styles.logo}
+            />
+            <View style={styles.header}>
+              <Text style={styles.medicationLabel}>
+                {medicationName} - {medicationType}, {medicationDosage}{" "}
+                {TypemedicationDosage}, {medicationForm}
+              </Text>
+              <Text style={styles.headerText}>Escolha a Forma</Text>
+            </View>
+            <View style={styles.gridContainer}>
+              <TouchableOpacity
+                style={styles.gridItem}
+                onPress={() => handleFormSelection("Capsule")}
+              >
+                <CapsuleIcon color="#007bff" size={50} />
+                <Text style={styles.gridLabel}>Cápsula</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.gridItem}
+                onPress={() => setMedicationForm("Pill")}
+              >
+                <PillIcon color="#007bff" size={50} />
 
-              <Text style={styles.gridLabel}>Comprimido</Text>
-            </TouchableOpacity>
+                <Text style={styles.gridLabel}>Comprimido</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.gridItem}
+                onPress={() => setMedicationForm("Potinho")}
+              >
+                <PoteIcon color="#007bff" size={50} />
+                <Text style={styles.gridLabel}>Pote de Remédio</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.gridItem}
+                onPress={() => setMedicationForm("ComprimidoRetangular")}
+              >
+                <ComprimidoRetangularIcon color="#007bff" size={50} />
+                <Text style={styles.gridLabel}>Comprimido Retangulo</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.gridItem}
+                onPress={() => setMedicationForm("Injecao")}
+              >
+                <InjecaoIcon color="#007bff" size={50} />
+                <Text style={styles.gridLabel}>Siringa de Injeção</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.gridItem}
+                onPress={() => setMedicationForm("Adesivo")}
+              >
+                <AdesivoIcon color="#007bff" size={50} />
+                <Text style={styles.gridLabel}>Adesivo</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.gridItem}
+                onPress={() => setMedicationForm("Cream")}
+              >
+                <CremeIcon color="#007bff" size={50} />
+                <Text style={styles.gridLabel}>Creme</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.gridItem}
+                onPress={() => setMedicationForm("Spray")}
+              >
+                <SprayIcon color="#007bff" size={50} />
+                <Text style={styles.gridLabel}>Spray</Text>
+              </TouchableOpacity>
+              {/* Adicione mais opções conforme necessário */}
+            </View>
             <TouchableOpacity
-              style={styles.gridItem}
-              onPress={() => setMedicationForm("Potinho")}
+              style={[styles.button, !medicationForm && styles.buttonDisabled]}
+              onPress={handleNext}
+              disabled={!medicationForm}
             >
-              <PoteIcon color="#007bff" size={50} />
-              <Text style={styles.gridLabel}>Pote de Remédio</Text>
+              <Text style={styles.buttonText}>Seguinte</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.gridItem}
-              onPress={() => setMedicationForm("ComprimidoRetangular")}
-            >
-              <ComprimidoRetangularIcon color="#007bff" size={50} />
-              <Text style={styles.gridLabel}>Comprimido Retangulo</Text>
+            <TouchableOpacity style={styles.backButton} onPress={handlePrevious}>
+              <Text style={styles.buttonText}>Voltar</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.gridItem}
-              onPress={() => setMedicationForm("Injecao")}
-            >
-              <InjecaoIcon color="#007bff" size={50} />
-              <Text style={styles.gridLabel}>Siringa de Injeção</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.gridItem}
-              onPress={() => setMedicationForm("Adesivo")}
-            >
-              <AdesivoIcon color="#007bff" size={50} />
-              <Text style={styles.gridLabel}>Adesivo</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.gridItem}
-              onPress={() => setMedicationForm("Cream")}
-            >
-              <CremeIcon color="#007bff" size={50} />
-              <Text style={styles.gridLabel}>Creme</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.gridItem}
-              onPress={() => setMedicationForm("Spray")}
-            >
-              <SprayIcon color="#007bff" size={50} />
-              <Text style={styles.gridLabel}>Spray</Text>
-            </TouchableOpacity>
-            {/* Adicione mais opções conforme necessário */}
           </View>
-          <TouchableOpacity
-            style={[styles.button, !medicationForm && styles.buttonDisabled]}
-            onPress={handleNext}
-            disabled={!medicationForm}
-          >
-            <Text style={styles.buttonText}>Seguinte</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.backButton} onPress={handlePrevious}>
-            <Text style={styles.buttonText}>Voltar</Text>
-          </TouchableOpacity>
-        </View>
+        </ScrollView>
+
       )}
 
       {currentStep === 5 && (
@@ -811,6 +825,7 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     //paddingRight: 10,
     alignItems: "center",
+
   },
   title: {
     fontSize: 24,
@@ -838,12 +853,15 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   sectionContainer: {
-    backgroundColor: "#f7f7f7",
+    backgroundColor: "#fff",
     borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#65BF85",
     padding: 10,
     marginVertical: 10,
     width: "100%",
     alignSelf: "center",
+    //alignItems: "center"
   },
   sectionHeader: {
     fontSize: 18,
@@ -855,9 +873,10 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     width: "100%",
     paddingHorizontal: 10,
-    backgroundColor: "#e6e6e6",
-    borderRadius: 5,
+    backgroundColor: "#e8f5e9",
+    borderRadius: 10,
     marginVertical: 5,
+    paddingLeft: 15,
   },
   optionText: {
     fontSize: 20,
@@ -887,11 +906,12 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     textAlign: "center",
-    
+
   },
   scrollView: {
     backgroundColor: "white",
     marginHorizontal: 20,
+    width: 320,
   },
   modalContent: {
     padding: 20,
@@ -939,18 +959,20 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   input: {
-    height: 40,
+    height: 47,
     borderColor: "gray",
     borderWidth: 1,
+    borderColor: "#65BF85",
+    borderRadius: 10,
     padding: 10,
     marginVertical: 10,
-    width: "100%", // Garanta que a largura esteja correta
+    width: 320, // Garanta que a largura esteja correta
   },
   backButton: {
-    backgroundColor: "#ccc",
+    backgroundColor: "#007bff",
     padding: 15,
-    borderRadius: 5,
-    width: "90%",
+    borderRadius: 10,
+    width: "85%",
     alignItems: "center",
     marginTop: 20,
   },
@@ -972,9 +994,10 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     justifyContent: "space-around",
     padding: 10,
+    //height: 500,
   },
   gridItem: {
-    width: "20%", // Ajuste conforme necessário para seu layout
+    width: "50%", // Ajuste conforme necessário para seu layout
     justifyContent: "center",
     alignItems: "center",
     margin: 5,
@@ -1048,10 +1071,11 @@ const styles = StyleSheet.create({
   button: {
     backgroundColor: "#007bff",
     padding: 15,
-    borderRadius: 5,
-    width: "90%",
+    borderRadius: 10,
+    width: "85%",
     alignItems: "center",
-    marginTop: 20,
+    marginTop: 15,
+    alignSelf: "center",
   },
   buttonText: {
     color: "#fff",
@@ -1132,6 +1156,7 @@ const styles = StyleSheet.create({
   info: {
     fontSize: 16,
     marginBottom: 5,
+    //height: "auto"
   },
   colorCircle: {
     width: 40,
@@ -1149,14 +1174,14 @@ const styles = StyleSheet.create({
   },
   medicationCard: {
     flexDirection: "row",
-    width: "100%", // Deve ser 100% para preencher a largura da tela corretamente
+    width: "auto", // Deve ser 100% para preencher a largura da tela corretamente
     height: 120, // Altura fixa para todos os cartões
     //padding: 10, // Remover padding para que a imagem possa preencher todo o espaço
     marginVertical: 10, // Espaçamento vertical entre os cartões
     backgroundColor: "#FFFFFF", // Fundo branco
     borderRadius: 10, // Bordas arredondadas
     borderWidth: 1, // Largura da borda
-    borderColor: "#000", // Cor da borda preta
+    borderColor: "#65BF85", // Cor da borda preta
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.25,
@@ -1176,6 +1201,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     paddingLeft: 1, // Espaço à esquerda para separar o texto da imagem
+    width: "100%",
   },
 
   medicationName: {
@@ -1188,6 +1214,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: "#666", // Cor cinza para os detalhes
   },
+  step: {
+    widht: "100%",
+  }
 });
 
 const markdownStyles = {

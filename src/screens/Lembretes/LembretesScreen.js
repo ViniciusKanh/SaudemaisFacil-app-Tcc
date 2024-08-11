@@ -1,6 +1,4 @@
-// LembreteScreen.js
-// LembreteScreen.js
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,12 +6,35 @@ import {
   StyleSheet,
   SafeAreaView,
   Alert,
+  Platform,
 } from "react-native";
 import RemindersConsultationScreen from "./Consulta/RemindersConsultationScreen";
 import * as Notifications from "expo-notifications";
+import Constants from "expo-constants";
+import * as Device from "expo-device";
 
 const LembretesScreen = ({ navigation }) => {
   const [isModalVisible, setModalVisible] = useState(false);
+
+  useEffect(() => {
+    registerForPushNotificationsAsync().then(token => {
+      if (token) {
+        console.log("Token de notificação:", token);
+      }
+    });
+    const notificationListener = Notifications.addNotificationReceivedListener(notification => {
+      console.log("Notificação recebida:", notification);
+    });
+
+    const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log("Resposta de notificação:", response);
+    });
+
+    return () => {
+      Notifications.removeNotificationSubscription(notificationListener);
+      Notifications.removeNotificationSubscription(responseListener);
+    };
+  }, []);
 
   const openModal = () => setModalVisible(true);
   const closeModal = () => setModalVisible(false);
@@ -21,40 +42,51 @@ const LembretesScreen = ({ navigation }) => {
 
   const sendTestNotification = async () => {
     try {
-      const permission = await Notifications.getPermissionsAsync();
-      if (!permission.granted) {
-        const newPermission = await Notifications.requestPermissionsAsync({
-          ios: {
-            allowAlert: true,
-            allowBadge: true,
-            allowSound: true,
-            allowAnnouncements: true,
-          },
-        });
-
-        if (!newPermission.granted) {
-          Alert.alert(
-            "Permissão Negada",
-            "Notificações não serão enviadas. Por favor, conceda permissão nas configurações do app."
-          );
-          return;
-        }
-      }
-
       await Notifications.scheduleNotificationAsync({
         content: {
           title: "Teste Imediato",
           body: "Esta é uma notificação de teste disparada imediatamente.",
           sound: 'default',
         },
-        trigger: null, // Dispara imediatamente
+        trigger: { seconds: 2 }, // Dispara após 2 segundos
       });
 
       Alert.alert("Notificação Teste", "Notificação de teste enviada!");
     } catch (error) {
       Alert.alert("Erro", "Falha ao enviar a notificação de teste!");
-      console.error(error);
+      console.error("Erro ao enviar notificação de teste:", error);
     }
+  };
+
+  const registerForPushNotificationsAsync = async () => {
+    let token;
+    if (Device.isDevice) {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      if (finalStatus !== 'granted') {
+        Alert.alert('Falha ao obter permissão para notificações!');
+        return;
+      }
+      token = (await Notifications.getExpoPushTokenAsync()).data;
+      console.log("Token de notificação registrado:", token);
+    } else {
+      Alert.alert('Deve usar um dispositivo físico para Push Notifications');
+    }
+
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'default',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+      });
+    }
+
+    return token;
   };
 
   return (
@@ -81,12 +113,7 @@ const LembretesScreen = ({ navigation }) => {
           >
             <Text style={styles.buttonText}>Visualizar</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.button}
-            onPress={sendTestNotification}
-          >
-            <Text style={styles.buttonText}>Testar Notificação</Text>
-          </TouchableOpacity>
+         
         </View>
       </View>
 
@@ -101,8 +128,7 @@ const LembretesScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center", // Isso vai centralizar os contêineres verticalmente
-    //alignItems: "center",
+    justifyContent: "center",
     backgroundColor: "#FFFFFF",
   },
   header: {
@@ -141,13 +167,13 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: "#65BF85",
-    marginVertical: 10, // Espaço uniforme acima e abaixo de cada botão
-    width: "100%", // Faz com que o botão se expanda para a largura do contêiner
+    marginVertical: 10,
+    width: "100%",
   },
   buttonText: {
     color: "#000000",
     fontSize: 18,
-    textAlign: "center", // Centraliza o texto no botão
+    textAlign: "center",
   },
 });
 

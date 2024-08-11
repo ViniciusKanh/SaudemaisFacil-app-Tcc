@@ -1,4 +1,3 @@
-// PerfilScreen.js
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -19,6 +18,7 @@ import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 
 const calendarIcon = require("../assets/icones/calendario.png");
+const defaultAvatar = require("../assets/perfil/profile-pic.jpg"); // Certifique-se de que o caminho esteja correto
 
 const auth = getAuth();
 const PerfilScreen = (props) => {
@@ -32,11 +32,6 @@ const PerfilScreen = (props) => {
   const [date, setDate] = useState(new Date());
   const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
 
-  // Função para mostrar o DateTimePicker
-  const showDatePicker = () => {
-    setIsDatePickerVisible(true);
-  };
-
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       if (user) {
@@ -48,66 +43,25 @@ const PerfilScreen = (props) => {
 
     return unsubscribeAuth;
   }, []);
-  useEffect(() => {
-    // Esta função busca o perfil do usuário
-    const fetchUserProfile = async (uid) => {
-      const docRef = doc(db, "users", uid);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        let data = docSnap.data();
-        let formattedDate = data.birthDate
-          ? new Date(data.birthDate.seconds * 1000)
-          : new Date();
-        setUserData({
-          ...data,
-          birthDate: formattedDate,
-          email: auth.currentUser?.email || "",
-        });
-        setDate(formattedDate);
-      } else {
-        console.log("No such document!");
-      }
-    };
-
-    if (auth.currentUser) {
-      fetchUserProfile(auth.currentUser.uid);
-    }
-  }, [auth.currentUser]);
-
-  const fetchBloodTypes = async () => {
-    setAvailableBloodTypes(["A+", "A-", "O-", "B+", "AB+", "AB-", "O+", "B-"]);
-  };
 
   const fetchUserProfile = async (uid) => {
-    const userRef = doc(db, "users", uid);
-    try {
-      const userSnap = await getDoc(userRef);
-      if (userSnap.exists()) {
-        const userProfileData = userSnap.data();
-
-        // Converter Timestamp do Firestore para objeto Date
-        const birthDate = userProfileData.birthDate.toDate
-          ? userProfileData.birthDate.toDate()
-          : new Date();
-
-        // Atualizar o estado com os dados do usuário
-        setUserData({
-          ...userProfileData, // Incorpora todos os dados recuperados
-          birthDate: birthDate, // Armazenar como objeto Date
-        });
-
-        setDate(birthDate); // Atualizar o estado da data para a UI do DatePicker
-      } else {
-        console.error("Usuário não encontrado.");
-        Alert.alert("Erro", "Perfil do usuário não encontrado.");
-      }
-    } catch (error) {
-      console.error("Erro ao buscar perfil do usuário:", error);
-      Alert.alert("Erro ao buscar perfil", error.message);
+    const docRef = doc(db, "users", uid);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      let data = docSnap.data();
+      let formattedDate = data.birthDate
+        ? new Date(data.birthDate.seconds * 1000)
+        : new Date();
+      setUserData({
+        ...data,
+        birthDate: formattedDate,
+        email: auth.currentUser?.email || "",
+      });
+      setDate(formattedDate);
+    } else {
+      console.log("No such document!");
     }
   };
-
-  const [isSaving, setIsSaving] = useState(false); // Adiciona um estado para o indicador de carregamento.
 
   const handleSaveProfile = async () => {
     const userId = auth.currentUser ? auth.currentUser.uid : null;
@@ -116,15 +70,11 @@ const PerfilScreen = (props) => {
       return;
     }
 
-    setIsSaving(true);
-
     try {
-      // Aqui você precisa converter o objeto Date para um Timestamp antes de atualizar
       const birthDateTimestamp = Timestamp.fromDate(userData.birthDate);
 
       await updateDoc(doc(db, "users", userId), {
         fullName: userData.fullName,
-        // Certifique-se de passar o objeto Timestamp aqui
         birthDate: birthDateTimestamp,
         phoneNumber: userData.phoneNumber,
       });
@@ -133,23 +83,16 @@ const PerfilScreen = (props) => {
     } catch (error) {
       console.error("Erro ao salvar perfil:", error);
       Alert.alert("Erro", "Falha ao salvar o perfil: " + error.message);
-    } finally {
-      setIsSaving(false);
     }
   };
 
-  const handleDateChange = (event, selectedDate) => {
+  const handleDateChange = (selectedDate) => {
     setIsDatePickerVisible(false);
     if (selectedDate) {
       setDate(selectedDate);
       setUserData({ ...userData, birthDate: selectedDate });
     }
   };
-
-  // Substitua 'default_avatar.png' pelo caminho para a sua imagem padrão
-  const defaultAvatar = Image.resolveAssetSource(
-    require("../assets/perfil/profile-pic.svg")
-  ).uri;
 
   const handleImagePick = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
@@ -158,12 +101,8 @@ const PerfilScreen = (props) => {
       quality: 1,
     });
 
-    // Verifique se a seleção não foi cancelada e se a matriz 'assets' está presente
     if (!result.canceled && result.assets) {
-      // Supondo que só haja uma imagem selecionada, pegue o primeiro item da matriz 'assets'
       const image = result.assets[0];
-
-      // Agora você pode usar 'image.uri' para acessar o URI da imagem selecionada
       if (image.uri) {
         uploadImage(image.uri);
       }
@@ -185,7 +124,6 @@ const PerfilScreen = (props) => {
       const downloadUrl = await getDownloadURL(storageRef);
       setUserData({ ...userData, profileImageUrl: downloadUrl });
 
-      // Atualizar o perfil do usuário no Firestore com a nova URL da imagem
       await updateDoc(doc(db, "users", userId), {
         profileImageUrl: downloadUrl,
       });
@@ -200,52 +138,14 @@ const PerfilScreen = (props) => {
   const handleLogout = () => {
     signOut(auth)
       .then(() => {
-        // Deslogou com sucesso, redirecione para a tela de login
         navigation.reset({
           index: 0,
-          routes: [{ name: "Login" }], // O nome 'Login' deve corresponder ao nome da rota definida no Stack.Navigator
+          routes: [{ name: "Login" }],
         });
       })
       .catch((error) => {
-        // Houve um erro no logout
         Alert.alert("Erro ao sair", error.message);
       });
-  };
-
-  const updateBirthDate = async (userId, date) => {
-    try {
-      // Cria um Timestamp a partir da data
-      const birthDate = Timestamp.fromDate(date); // Use o objeto Timestamp importado
-
-      // Atualiza a coleção de usuários com a nova data de nascimento
-      const userRef = doc(db, "users", userId);
-      await updateDoc(userRef, {
-        birthDate: birthDate, // Utiliza o Timestamp
-      });
-      Alert.alert(
-        "Data de Nascimento",
-        "Data de nascimento atualizada com sucesso."
-      );
-    } catch (error) {
-      console.error("Erro ao atualizar a data de nascimento:", error);
-      Alert.alert("Erro", "Não foi possível atualizar a data de nascimento.");
-    }
-  };
-
-  const handleConfirmDate = async (date) => {
-    try {
-      // Atualiza o estado da data de nascimento
-      setUserData({ ...userData, birthDate: date });
-      setIsDatePickerVisible(false);
-      // Chama a função de atualização de data de nascimento
-      await updateBirthDate(auth.currentUser.uid, date);
-    } catch (error) {
-      console.error("Erro ao confirmar data de nascimento:", error);
-      Alert.alert(
-        "Erro",
-        "Não foi possível atualizar a data de nascimento: " + error.message
-      );
-    }
   };
 
   return (
@@ -275,24 +175,22 @@ const PerfilScreen = (props) => {
           onPress={() => setIsDatePickerVisible(true)}
         >
           <Text style={styles.datePickerText}>
-            {userData.birthDate.toLocaleDateString()}
+            {userData.birthDate ? userData.birthDate.toLocaleDateString() : "Selecionar Data"}
           </Text>
         </TouchableOpacity>
         <DateTimePickerModal
           isVisible={isDatePickerVisible}
           mode="date"
-          onConfirm={(date) => {
-            setUserData({ ...userData, birthDate: date });
-            setIsDatePickerVisible(false);
-          }}
+          onConfirm={handleDateChange}
           onCancel={() => setIsDatePickerVisible(false)}
-          date={userData.birthDate}
+          date={date}
+          textColor="black" // Adiciona cor ao texto
         />
         <Text style={styles.label}>E-mail</Text>
         <TextInput
           style={styles.input}
           value={auth.currentUser ? auth.currentUser.email : ""}
-          editable={false} // Isso torna o campo de e-mail não editável
+          editable={false}
         />
         <Text style={styles.label}>Telefone de Contato</Text>
         <TextInput
@@ -313,35 +211,13 @@ const PerfilScreen = (props) => {
   );
 };
 
-const pickerSelectStyles = StyleSheet.create({
-  inputIOS: {
-    fontSize: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: "gray",
-    borderRadius: 4,
-    color: "black",
-    paddingRight: 30,
-  },
-  inputAndroid: {
-    fontSize: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderWidth: 0.5,
-    borderColor: "purple",
-    borderRadius: 8,
-    color: "black",
-    paddingRight: 30, // para garantir que o texto não fique escondido atrás do ícone
-  },
-});
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFF",
   },
   contentContainer: {
-    alignItems: "center", // Agora isso é aplicado corretamente
+    alignItems: "center",
     justifyContent: "center",
   },
   profileImageContainer: {
@@ -367,32 +243,20 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: "gray",
+    borderColor: "#65BF85",
     borderRadius: 5,
     padding: 10,
     fontSize: 16,
   },
   button: {
-    backgroundColor: "#007bff",
+    backgroundColor: "#00D315",
     padding: 15,
     borderRadius: 5,
     alignItems: "center",
     marginTop: 20,
   },
-  pickerContainer: {
-    marginVertical: 20, // Adiciona espaço vertical
-    width: "100%", // Ocupa toda a largura
-    borderWidth: 1,
-    borderColor: "gray",
-    borderRadius: 10,
-  },
-  picker: {
-    height: 50, // Ajuste a altura conforme necessário
-    width: "100%",
-    // Outros estilos que você possa querer adicionar
-  },
   buttonText: {
-    color: "white",
+    color: "black",
     fontSize: 16,
     fontWeight: "bold",
   },
@@ -401,8 +265,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "gray",
-    borderRadius: 4,
+    borderColor: "#65BF85",
+    borderRadius: 10,
     padding: 10,
     marginTop: 8,
   },
@@ -414,14 +278,14 @@ const styles = StyleSheet.create({
     height: 20,
   },
   logoutButton: {
-    backgroundColor: "red", // Cor do botão de logout
+    backgroundColor: "red",
     padding: 15,
-    borderRadius: 5,
+    borderRadius: 10,
     alignItems: "center",
     marginTop: 20,
   },
   logoutButtonText: {
-    color: "white", // Cor do texto dentro do botão de logout
+    color: "black",
     fontSize: 16,
     fontWeight: "bold",
   },

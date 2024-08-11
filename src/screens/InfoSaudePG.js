@@ -1,4 +1,3 @@
-// InfoSaudePG.js
 import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
@@ -6,11 +5,9 @@ import {
   StyleSheet,
   ScrollView,
   RefreshControl,
-  Button,
   TextInput,
   Alert,
   TouchableOpacity,
-  Platform,
 } from "react-native";
 import { getAuth } from "firebase/auth";
 import { db } from "../config/firebaseConfig";
@@ -80,7 +77,6 @@ const InfoSaudePG = () => {
 
     const jejumDias = glicemiaData.filter((item) => item.Infasting).length;
 
-    // Atualizar os estados
     setAverageSistolica(averageSistolica);
     setAverageDiastolica(averageDiastolica);
     setMostFrequentHumorPressao(mostFrequentHumorPressao);
@@ -89,60 +85,6 @@ const InfoSaudePG = () => {
     setMostFrequentHumorGlicemia(mostFrequentHumorGlicemia);
     setJejumDias(jejumDias);
   };
-
-  useEffect(() => {
-    if (pressaoData.length > 0) {
-      const totalSistolica = pressaoData.reduce(
-        (acc, curr) => acc + parseInt(curr.Sistolica, 10),
-        0
-      );
-      const averageSistolicaCalc = totalSistolica / pressaoData.length;
-      setAverageSistolica(averageSistolicaCalc);
-
-      const totalDiastolica = pressaoData.reduce(
-        (acc, curr) => acc + parseInt(curr.Diastolica, 10),
-        0
-      );
-      const averageDiastolicaCalc = totalDiastolica / pressaoData.length;
-      setAverageDiastolica(averageDiastolicaCalc);
-
-      const humorCounts = {};
-      pressaoData.forEach((item) => {
-        humorCounts[item.Humor] = (humorCounts[item.Humor] || 0) + 1;
-      });
-      const mostFrequent = Object.keys(humorCounts).reduce(
-        (a, b) => (humorCounts[a] > humorCounts[b] ? a : b),
-        ""
-      );
-      setMostFrequentHumorPressao(mostFrequent);
-
-      const tonturaCount = pressaoData.filter((item) => item.Tontura).length;
-      setTonturaDias(tonturaCount);
-    }
-
-    if (glicemiaData.length > 0) {
-      const totalGlicemia = glicemiaData.reduce(
-        (acc, curr) => acc + parseInt(curr.Glicemia, 10),
-        0
-      );
-      const averageGlicemiaCalc = totalGlicemia / glicemiaData.length;
-      setAverageGlicemia(averageGlicemiaCalc);
-
-      const humorCountsGlicemia = {};
-      glicemiaData.forEach((item) => {
-        humorCountsGlicemia[item.Humor] =
-          (humorCountsGlicemia[item.Humor] || 0) + 1;
-      });
-      const mostFrequentGlicemia = Object.keys(humorCountsGlicemia).reduce(
-        (a, b) => (humorCountsGlicemia[a] > humorCountsGlicemia[b] ? a : b),
-        ""
-      );
-      setMostFrequentHumorGlicemia(mostFrequentGlicemia);
-
-      const jejumCount = glicemiaData.filter((item) => item.Infasting).length;
-      setJejumDias(jejumCount);
-    }
-  }, [pressaoData, glicemiaData]);
 
   useEffect(() => {
     calculateStatistics();
@@ -202,28 +144,19 @@ const InfoSaudePG = () => {
     );
   };
 
-  const onChangeStartDate = (event, selectedDate) => {
-    setShowStartDatePicker(false);
-    if (selectedDate) {
+  const handleDateChange = (picker, selectedDate) => {
+    if (picker === 'start') {
+      setShowStartDatePicker(false);
       setStartDate(selectedDate);
-    } else {
-      setStartDate(new Date()); // Garante que sempre haverá uma data válida
-    }
-  };
-
-  const onChangeEndDate = (event, selectedDate) => {
-    setShowEndDatePicker(false);
-    if (selectedDate) {
+    } else if (picker === 'end') {
+      setShowEndDatePicker(false);
       setEndDate(selectedDate);
-    } else {
-      setEndDate(new Date());
     }
   };
 
   const exportToExcel = async () => {
     const wb = XLSX.utils.book_new();
 
-    // Crie planilhas para os dados detalhados
     const ws1 = XLSX.utils.json_to_sheet(
       pressaoData.map((data) => ({
         "Data/Hora": new Date(data.DataHora.seconds * 1000).toLocaleString(),
@@ -241,7 +174,6 @@ const InfoSaudePG = () => {
       }))
     );
 
-    // Adicione resumos à planilha
     const summaryData = [
       ["Média de Pressão Arterial Sistólica", averageSistolica.toFixed(1)],
       ["Média de Pressão Arterial Diastólica", averageDiastolica.toFixed(1)],
@@ -300,13 +232,12 @@ const InfoSaudePG = () => {
       {pressaoData.map((item, index) => {
         const sistolica = parseInt(item.Sistolica, 10);
         const diastolica = parseInt(item.Diastolica, 10);
-        let backgroundColor = "#fff"; // Cor padrão
+        let backgroundColor = "#fff";
 
-        // Altera a cor de fundo se a pressão estiver alta ou baixa
         if (sistolica > 140 || diastolica > 90) {
-          backgroundColor = "#ffcccc"; // Vermelho claro para pressão alta
+          backgroundColor = "#ffcccc";
         } else if (sistolica < 110 || diastolica < 60) {
-          backgroundColor = "#ccccff"; // Azul claro para pressão baixa
+          backgroundColor = "#ccccff";
         }
 
         return (
@@ -367,12 +298,12 @@ const InfoSaudePG = () => {
     <View style={styles.table}>
       <TableHeader headers={["Data e Hora", "Glicemia", "Em Jejum", "Humor"]} />
       {glicemiaData.map((item, index) => {
-        let backgroundColor = "#fff"; // Cor padrão para linhas normais
+        let backgroundColor = "#fff";
 
         if (item.Glicemia > 100) {
-          backgroundColor = "#ffcccc"; // Vermelho claro para glicemia alta
+          backgroundColor = "#ffcccc";
         } else if (item.Glicemia < 70) {
-          backgroundColor = "#ccccff"; // Azul claro para glicemia baixa
+          backgroundColor = "#ccccff";
         }
 
         return (
@@ -390,6 +321,7 @@ const InfoSaudePG = () => {
       })}
     </View>
   );
+
   const calculateSummary = () => {
     if (!pressaoData.length) {
       return (
@@ -442,12 +374,13 @@ const InfoSaudePG = () => {
   const GlicemiaSummarySection = () => (
     <View style={styles.summarySection}>{calculateGlicemiaSummary()}</View>
   );
+
   const renderDatePickers = () => (
     <View style={styles.datePickerContainer}>
       <View style={styles.dateInputWrapper}>
         <TextInput
           style={styles.dateInput}
-          value={startDate.toLocaleDateString()}
+          value={startDate ? startDate.toLocaleDateString() : "Selecionar Data"}
           editable={false}
         />
         <TouchableOpacity
@@ -456,23 +389,19 @@ const InfoSaudePG = () => {
         >
           <Text style={styles.buttonText}>Escolher Data Inicial</Text>
         </TouchableOpacity>
-        {showStartDatePicker && (
-          <DateTimePickerModal
-            isVisible={showStartDatePicker}
-            mode="date"
-            onConfirm={(date) => {
-              setStartDate(date);
-              setShowStartDatePicker(false);
-            }}
-            onCancel={() => setShowStartDatePicker(false)}
-            date={startDate}
-          />
-        )}
+        <DateTimePickerModal
+          isVisible={showStartDatePicker}
+          mode="date"
+          onConfirm={(date) => handleDateChange('start', date)}
+          onCancel={() => setShowStartDatePicker(false)}
+          date={startDate}
+          textColor="black" // Adiciona cor ao texto
+        />
       </View>
       <View style={styles.dateInputWrapper}>
         <TextInput
           style={styles.dateInput}
-          value={endDate.toLocaleDateString()}
+          value={endDate ? endDate.toLocaleDateString() : "Selecionar Data"}
           editable={false}
         />
         <TouchableOpacity
@@ -481,18 +410,14 @@ const InfoSaudePG = () => {
         >
           <Text style={styles.buttonText}>Escolher Data Final</Text>
         </TouchableOpacity>
-        {showEndDatePicker && (
-          <DateTimePickerModal
-            isVisible={showEndDatePicker}
-            mode="date"
-            onConfirm={(date) => {
-              setEndDate(date);
-              setShowEndDatePicker(false);
-            }}
-            onCancel={() => setShowEndDatePicker(false)}
-            date={endDate}
-          />
-        )}
+        <DateTimePickerModal
+          isVisible={showEndDatePicker}
+          mode="date"
+          onConfirm={(date) => handleDateChange('end', date)}
+          onCancel={() => setShowEndDatePicker(false)}
+          date={endDate}
+          textColor="black" // Adiciona cor ao texto
+        />
       </View>
     </View>
   );
@@ -549,7 +474,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 10,
     alignItems: "center",
-    marginBottom: 10, // Ensure separation from other elements
+    marginBottom: 10,
   },
   section: {
     marginBottom: 20,
@@ -560,12 +485,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   table: {
-    alignSelf: "stretch", // Para ocupar toda a largura disponível
+    alignSelf: "stretch",
   },
   tableRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center", // Para centralizar os itens na linha
+    alignItems: "center",
     paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: "#ddd",
@@ -573,39 +498,32 @@ const styles = StyleSheet.create({
   tableCell: {
     flex: 1,
     fontSize: 16,
-    paddingHorizontal: 2, // Adiciona um pequeno espaçamento horizontal
-    textAlign: "center", // Centraliza o texto na célula
+    paddingHorizontal: 2,
+    textAlign: "center",
   },
   tableHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     padding: 8,
-    backgroundColor: "#f0f0f0", // Cor de fundo do cabeçalho
+    backgroundColor: "#f0f0f0",
   },
   tableHeaderCell: {
-    fontWeight: "bold", // Texto em negrito
-    fontSize: 16, // Tamanho do texto
-    // Adicione mais estilos conforme necessário
+    fontWeight: "bold",
+    fontSize: 16,
   },
   summaryText: {
-    fontSize: 18, // Make sure the text is larger if needed
-    marginTop: 10, // Add some space above the summary for clarity
-    // Add any other styling you wish here
+    fontSize: 18,
+    marginTop: 10,
   },
   boldText: {
     fontWeight: "bold",
-    // You might not need additional properties here as <Text> style inheritance works within nested <Text> components
   },
-  // Make sure you have styles for your summarySection if you need to adjust layout or padding
   summarySection: {
     paddingTop: 10,
-    paddingBottom: 20, // Adjust this value as needed for bottom padding
-    // Add any other layout adjustments here
+    paddingBottom: 20,
   },
-
-  // Add a new style for the section that comes after a summary section
   sectionWithSpacing: {
-    marginTop: 20, // Adjust this value as needed for top margin
+    marginTop: 20,
   },
   datePickerWrapper: {
     flexDirection: "row",
@@ -660,13 +578,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     marginLeft: 10,
-  },
-  legendContainer: {
-    backgroundColor: "#e8e8e8",
-    borderRadius: 10,
-    padding: 10,
-    alignItems: "center",
-    marginBottom: 10,
   },
   legendTitle: {
     fontWeight: "bold",

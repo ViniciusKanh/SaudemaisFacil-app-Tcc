@@ -1,4 +1,3 @@
-//GlicemiaRellPersonalizado.js
 import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
@@ -50,7 +49,6 @@ const GlicemiaMonitoramento = () => {
       return;
     }
 
-    // Converte datas para Timestamp do Firebase
     const startTimestamp = Timestamp.fromDate(
       new Date(startDate.setHours(0, 0, 0, 0))
     );
@@ -71,9 +69,7 @@ const GlicemiaMonitoramento = () => {
       id: doc.id,
       ...doc.data(),
     }));
-    setGlicemiaData(
-      querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
-    );
+    setGlicemiaData(data);
     setTotalPages(Math.ceil(data.length / recordsPerPage));
   }, [startDate, endDate, user.uid]);
 
@@ -110,10 +106,18 @@ const GlicemiaMonitoramento = () => {
     calculateStatistics();
   }, [glicemiaData]);
 
-  const onChangeStartDate = (event, selectedDate) => {
-    setShowStartDatePicker(false);
-    const currentDate = selectedDate || startDate;
-    setStartDate(currentDate);
+  const handleDateChange = (type, selectedDate) => {
+    if (type === 'start') {
+      setShowStartDatePicker(false);
+      if (selectedDate) {
+        setStartDate(selectedDate);
+      }
+    } else if (type === 'end') {
+      setShowEndDatePicker(false);
+      if (selectedDate) {
+        setEndDate(selectedDate);
+      }
+    }
   };
 
   const onRefresh = useCallback(async () => {
@@ -132,7 +136,7 @@ const GlicemiaMonitoramento = () => {
       <View style={styles.dateInputWrapper}>
         <TextInput
           style={styles.dateInput}
-          value={startDate.toLocaleDateString()}
+          value={startDate ? startDate.toLocaleDateString() : "Selecionar Data"}
           editable={false}
         />
         <TouchableOpacity
@@ -141,23 +145,19 @@ const GlicemiaMonitoramento = () => {
         >
           <Text style={styles.buttonText}>Escolher Data Inicial</Text>
         </TouchableOpacity>
-        {showStartDatePicker && (
-          <DateTimePickerModal
-            isVisible={showStartDatePicker}
-            mode="date"
-            onConfirm={(date) => {
-              setStartDate(date);
-              setShowStartDatePicker(false);
-            }}
-            onCancel={() => setShowStartDatePicker(false)}
-            date={startDate}
-          />
-        )}
+        <DateTimePickerModal
+          isVisible={showStartDatePicker}
+          mode="date"
+          onConfirm={(date) => handleDateChange('start', date)}
+          onCancel={() => setShowStartDatePicker(false)}
+          date={startDate}
+          textColor="black" // Adiciona cor ao texto
+        />
       </View>
       <View style={styles.dateInputWrapper}>
         <TextInput
           style={styles.dateInput}
-          value={endDate.toLocaleDateString()}
+          value={endDate ? endDate.toLocaleDateString() : "Selecionar Data"}
           editable={false}
         />
         <TouchableOpacity
@@ -166,21 +166,18 @@ const GlicemiaMonitoramento = () => {
         >
           <Text style={styles.buttonText}>Escolher Data Final</Text>
         </TouchableOpacity>
-        {showEndDatePicker && (
-          <DateTimePickerModal
-            isVisible={showEndDatePicker}
-            mode="date"
-            onConfirm={(date) => {
-              setEndDate(date);
-              setShowEndDatePicker(false);
-            }}
-            onCancel={() => setShowEndDatePicker(false)}
-            date={endDate}
-          />
-        )}
+        <DateTimePickerModal
+          isVisible={showEndDatePicker}
+          mode="date"
+          onConfirm={(date) => handleDateChange('end', date)}
+          onCancel={() => setShowEndDatePicker(false)}
+          date={endDate}
+          textColor="black" // Adiciona cor ao texto
+        />
       </View>
     </View>
   );
+
   const renderGlicemiaTable = () => {
     const startIndex = currentPage * recordsPerPage;
     const endIndex = startIndex + recordsPerPage;
@@ -192,11 +189,11 @@ const GlicemiaMonitoramento = () => {
           headers={["Data e Hora", "Glicemia", "Em Jejum", "Humor"]}
         />
         {currentData.map((item, index) => {
-          let backgroundColor = "#fff"; // Default color
+          let backgroundColor = "#fff";
           if (item.Glicemia > 100) {
-            backgroundColor = "#ffcccc"; // Light red for high glucose
+            backgroundColor = "#ffcccc";
           } else if (item.Glicemia < 70) {
-            backgroundColor = "#ccccff"; // Light blue for low glucose
+            backgroundColor = "#ccccff";
           }
           return (
             <View key={index} style={[styles.tableRow, { backgroundColor }]}>
@@ -269,9 +266,7 @@ const GlicemiaMonitoramento = () => {
         A média de glicemia foi{" "}
         <Text style={styles.boldText}>{averageGlicemia.toFixed(1)} mg/dL</Text>.
         O humor mais frequente foi{" "}
-        <Text style={styles.boldText}>{mostFrequentHumor}</Text>. A pessoa
-        esteve em jejum por <Text style={styles.boldText}>{jejumDias}</Text>{" "}
-        dias.
+        <Text style={styles.boldText}>{mostFrequentHumor}</Text>.
       </Text>
     );
   };
@@ -292,12 +287,6 @@ const GlicemiaMonitoramento = () => {
     </View>
   );
 
-  const onChangeEndDate = (event, selectedDate) => {
-    setShowEndDatePicker(false);
-    const currentDate = selectedDate || endDate;
-    setEndDate(currentDate);
-  };
-
   const exportToExcel = async () => {
     const ws = XLSX.utils.json_to_sheet(
       glicemiaData.map((data) => ({
@@ -308,7 +297,6 @@ const GlicemiaMonitoramento = () => {
       }))
     );
 
-    // Dados de resumo
     const summaryData = [
       ["Média de Glicemia", averageGlicemia.toFixed(1)],
       ["Humor Mais Frequente", mostFrequentHumor],
@@ -387,15 +375,13 @@ const GlicemiaMonitoramento = () => {
   );
 };
 
-// Styles
-
 const styles = StyleSheet.create({
   legendContainer: {
     backgroundColor: "#e8e8e8",
     borderRadius: 10,
     padding: 10,
     alignItems: "center",
-    marginBottom: 10, // Ensure separation from other elements
+    marginBottom: 10,
   },
   section: {
     marginBottom: 20,
@@ -406,23 +392,18 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   table: {
-    alignSelf: "stretch", // Para ocupar toda a largura disponível
+    alignSelf: "stretch",
   },
   tableHeaderCell: {
-    fontWeight: "bold", // Texto em negrito
-    fontSize: 16, // Tamanho do texto
-    // Adicione mais estilos conforme necessário
+    fontWeight: "bold",
+    fontSize: 16,
   },
-  // Make sure you have styles for your summarySection if you need to adjust layout or padding
   summarySection: {
     paddingTop: 10,
-    paddingBottom: 20, // Adjust this value as needed for bottom padding
-    // Add any other layout adjustments here
+    paddingBottom: 20,
   },
-
-  // Add a new style for the section that comes after a summary section
   sectionWithSpacing: {
-    marginTop: 20, // Adjust this value as needed for top margin
+    marginTop: 20,
   },
   datePickerWrapper: {
     flexDirection: "row",
@@ -478,13 +459,6 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginLeft: 10,
   },
-  legendContainer: {
-    backgroundColor: "#e8e8e8",
-    borderRadius: 10,
-    padding: 10,
-    alignItems: "center",
-    marginBottom: 10,
-  },
   legendTitle: {
     fontWeight: "bold",
     fontSize: 16,
@@ -510,14 +484,13 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   greenContainer: {
-    backgroundColor: "#EDF3EF", // Cor de fundo verde claro
-    borderColor: "#9CCC65", // Cor da borda verde
-    borderWidth: 1, // Espessura da borda
-    borderRadius: 10, // Arredondamento da borda
-    padding: 10, // Espaçamento interno
-    marginBottom: 20, // Espaçamento abaixo do contêiner
+    backgroundColor: "#EDF3EF",
+    borderColor: "#9CCC65",
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 20,
   },
-
   tableHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -539,35 +512,34 @@ const styles = StyleSheet.create({
     padding: 10,
     backgroundColor: "#E0E0E0",
     borderRadius: 5,
-    marginHorizontal: 20, // Adiciona espaço horizontal entre os botões e o texto
+    marginHorizontal: 20,
   },
   pageNumberText: {
     fontSize: 16,
-    // Você pode adicionar margem aqui se precisar, mas `justifyContent: 'space-between'` deve ser suficiente
   },
   paginationContainer: {
     flexDirection: "row",
-    justifyContent: "space-between", // Isso espalhará os botões e o texto de forma igual
+    justifyContent: "space-between",
     alignItems: "center",
     padding: 10,
   },
   summaryGreenContainer: {
-    backgroundColor: "#EDF3EF", // Cor de fundo verde claro
-    borderColor: "#9CCC65", // Cor da borda verde
-    borderWidth: 1, // Espessura da borda
-    borderRadius: 10, // Arredondamento da borda
-    padding: 20, // Espaçamento interno
-    marginBottom: 20, // Espaçamento abaixo do contêiner
-    marginHorizontal: 10, // Margem horizontal para alinhamento estético
+    backgroundColor: "#EDF3EF",
+    borderColor: "#9CCC65",
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 20,
+    marginBottom: 20,
+    marginHorizontal: 10,
   },
   summaryText: {
-    fontSize: 18, // Tamanho do texto
-    color: "#333", // Cor do texto para melhor leitura
-    lineHeight: 24, // Espaçamento entre linhas
-    textAlign: "center", // Centralizar texto
+    fontSize: 18,
+    color: "#333",
+    lineHeight: 24,
+    textAlign: "center",
   },
   boldText: {
-    fontWeight: "bold", // Negrito
+    fontWeight: "bold",
   },
 });
 

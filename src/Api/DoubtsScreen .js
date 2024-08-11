@@ -118,10 +118,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   doubtContainer: {
-    backgroundColor: '#e7e7e7',
+    //backgroundColor: '#E0FDEA',
     padding: 10,
-    borderRadius: 5,
+    paddingTop: 10,
+    borderRadius: 10,
     marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#65BF85",
   },
   questionText: {
     fontSize: 16,

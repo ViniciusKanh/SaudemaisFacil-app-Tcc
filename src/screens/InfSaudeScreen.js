@@ -159,19 +159,19 @@ const InfSaudeScreen = (props) => {
       Alert.alert("Erro", "ID do usuário não definido.");
       return;
     }
-  
+
     setIsSaving(true);
-  
+
     // Encontrar o label da raça com base no valor selecionado
     const raceLabel = availableRaces.find(race => race.value === userData.race)?.label;
-  
+
     // Verificar se o label da raça foi encontrado antes de tentar salvar
     if (!raceLabel) {
       Alert.alert("Erro", "Raça selecionada não é válida.");
       setIsSaving(false);
       return;
     }
-  
+
     try {
       // Preparar os dados que serão atualizados, excluindo informações sensíveis
       const dataToUpdate = {
@@ -186,10 +186,10 @@ const InfSaudeScreen = (props) => {
         height: userData.height,
         weight: userData.weight
       };
-  
+
       // Atualizar o documento do usuário no Firestore
       await updateDoc(doc(db, "users", userId), dataToUpdate);
-  
+
       Alert.alert("Sucesso", "Perfil de saúde atualizado com sucesso.");
       fetchUserProfile(userId); // Atualizar os dados do usuário após o salvamento
     } catch (error) {
@@ -199,8 +199,8 @@ const InfSaudeScreen = (props) => {
       setIsSaving(false);
     }
   };
-  
-  
+
+
 
   const handleTextChange = (text, field) =>
     setUserData({ ...userData, [field]: text });
@@ -235,7 +235,7 @@ const InfSaudeScreen = (props) => {
     }
     return age;
   }
-  
+
 
   const calculateIMC = (weight, height) => {
     const heightInMeters = height / 100;
@@ -256,18 +256,18 @@ const InfSaudeScreen = (props) => {
 
   return (
     <ScrollView
-  style={styles.container}
-  contentContainerStyle={styles.contentContainer}
-  refreshControl={
-    <RefreshControl
-      refreshing={refreshing}
-      onRefresh={onRefresh}
-    />
-  }
->
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+        />
+      }
+    >
       <View style={styles.summaryContainer}>
         <Text style={styles.summaryTitle}>Resumo</Text>
-        
+
         <View style={styles.summaryRow}>
           <FontAwesome5 name="weight" size={24} style={styles.iconStyle} />
           <Text style={styles.summaryText}>
@@ -277,7 +277,7 @@ const InfSaudeScreen = (props) => {
         </View>
       </View>
       <View style={styles.infoContainer}>
-        <Text style={styles.label}>Cor</Text>
+        <Text style={styles.labelT}>Cor</Text>
         <RNPickerSelect
           onValueChange={(value) => {
             setSelectedRace(value);
@@ -291,7 +291,7 @@ const InfSaudeScreen = (props) => {
           value={selectedRace} // Use o estado selectedRace aqui
           placeholder={{ label: "Selecione uma cor...", value: null }}
         />
-        <Text style={styles.label}>Tipo Sanguíneo</Text>
+        <Text style={styles.labelT}>Tipo Sanguíneo</Text>
         <RNPickerSelect
           onValueChange={(value) => handleTextChange(value, "bloodType")}
           items={availableBloodTypes.map((bt) => ({ label: bt, value: bt }))}
@@ -300,14 +300,14 @@ const InfSaudeScreen = (props) => {
           useNativeAndroidPickerStyle={false} // desativa o estilo nativo do picker no Android
         />
 
-        <Text style={styles.label}>Altura</Text>
+        <Text style={styles.labelT}>Altura</Text>
         <TextInput
           style={styles.input}
           value={userData.height}
           placeholder="Digite o valor em cm"
           onChangeText={(text) => handleTextChange(text, "height")}
         />
-        <Text style={styles.label} >Peso(KG)</Text>
+        <Text style={styles.labelT} >Peso(KG)</Text>
         <TextInput
           style={styles.input}
           value={userData.weight}
@@ -315,49 +315,70 @@ const InfSaudeScreen = (props) => {
           onChangeText={(text) => handleTextChange(text, "weight")}
         />
 
-        <Text style={styles.label}>Diabetes?</Text>
-        <Switch
-          value={userData.hasDiabetes}
-          onValueChange={(value) => handleSwitchChange(value, "hasDiabetes")}
-        />
+        <View style={styles.bordas}>
+          <Text style={styles.label}>Diabetes?</Text>
+          <Switch
+            value={userData.hasDiabetes}
+            onValueChange={(value) => handleSwitchChange(value, "hasDiabetes")}
+          />
+        </View>
 
-        <Text style={styles.label}>Pressão Alta?</Text>
-        <Switch
-          value={userData.hasHypertension}
-          onValueChange={(value) =>
-            handleSwitchChange(value, "hasHypertension")
-          }
-        />
 
-        <Text style={styles.label}>Teve Infarto?</Text>
-        <Switch
-          value={userData.hadHeartAttack}
-          onValueChange={(value) => handleSwitchChange(value, "hadHeartAttack")}
-        />
+        <View style={styles.bordas}>
+          <Text style={styles.label}>Pressão Alta?</Text>
+          <Switch
+            value={userData.hasHypertension}
+            onValueChange={(value) =>
+              handleSwitchChange(value, "hasHypertension")
+            }
+          />
+        </View>
 
-        <Text style={styles.label}>Teve AVC?</Text>
-        <Switch
-          value={userData.hadStroke}
-          onValueChange={(value) => handleSwitchChange(value, "hadStroke")}
-        />
 
-        <Text style={styles.label}>Toma Medicamento Controlado?</Text>
-        <Switch
-          value={userData.takesControlledMedication}
-          onValueChange={(value) =>
-            handleSwitchChange(value, "takesControlledMedication")
-          }
-        />
+        <View style={styles.bordas}>
+          <Text style={styles.label}>Teve Infarto?</Text>
+          <Switch
+            value={userData.hadHeartAttack}
+            onValueChange={(value) => handleSwitchChange(value, "hadHeartAttack")}
+          />
+        </View>
 
-        <Text style={styles.label}>Doador de Órgãos?</Text>
-        <Switch
-          value={userData.isOrganDonor}
-          onValueChange={(value) => handleSwitchChange(value, "isOrganDonor")}
-        />
 
-        <TouchableOpacity style={styles.button} onPress={handleSaveProfile}>
-          <Text style={styles.buttonText}>Salvar</Text>
-        </TouchableOpacity>
+        <View style={styles.bordas}>
+          <Text style={styles.label}>Teve AVC?</Text>
+          <Switch
+            value={userData.hadStroke}
+            onValueChange={(value) => handleSwitchChange(value, "hadStroke")}
+          />
+        </View>
+
+
+        <View style={styles.bordas}>
+          <Text style={styles.label}>Toma Medicamento Controlado?</Text>
+          <Switch
+            value={userData.takesControlledMedication}
+            onValueChange={(value) =>
+              handleSwitchChange(value, "takesControlledMedication")
+            }
+          />
+        </View>
+
+
+        <View style={styles.bordas}>
+          <Text style={styles.label}>Doador de Órgãos?</Text>
+          <Switch
+            value={userData.isOrganDonor}
+            onValueChange={(value) => handleSwitchChange(value, "isOrganDonor")}
+          />
+        </View>
+
+
+        <View style={styles.btn}>
+          <TouchableOpacity style={styles.button} onPress={handleSaveProfile}>
+            <Text style={styles.buttonText}>Salvar</Text>
+          </TouchableOpacity>
+        </View>
+
       </View>
     </ScrollView>
   );
@@ -369,7 +390,7 @@ const pickerSelectStyles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 10,
     borderWidth: 1,
-    borderColor: "gray",
+    borderColor: "#65BF85",
     borderRadius: 10,
     color: "black",
     paddingRight: 30,
@@ -379,7 +400,7 @@ const pickerSelectStyles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderWidth: 0.5,
-    borderColor: "purple",
+    borderColor: "#65BF85",
     borderRadius: 10,
     color: "black",
     paddingRight: 30, // para garantir que o texto não fique escondido atrás do ícone
@@ -414,22 +435,34 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: "bold",
-    marginTop: 20,
-    
+    //marginTop: 20,
+    paddingLeft: 10,
+  },
+  labelT: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginTop: 5,
+
   },
   input: {
     borderWidth: 1,
-    borderColor: "gray",
+    borderColor: "#65BF85",
     borderRadius: 10,
     padding: 10,
     fontSize: 16,
+    marginBottom: 5,
+  },
+  btn: {
+    alignItems: "center",
   },
   button: {
-    backgroundColor: "#007bff",
+    backgroundColor: "#00D315",
     padding: 15,
     borderRadius: 5,
     alignItems: "center",
     marginTop: 20,
+    borderRadius: 10,
+    width: 280,
   },
   pickerContainer: {
     marginVertical: 20, // Adiciona espaço vertical
@@ -444,7 +477,7 @@ const styles = StyleSheet.create({
     // Outros estilos que você possa querer adicionar
   },
   buttonText: {
-    color: "white",
+    color: "black",
     fontSize: 16,
     fontWeight: "bold",
   },
@@ -478,7 +511,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   summaryContainer: {
-    backgroundColor: "#e3f2fd",
+    backgroundColor: "#E0FDEA",
     padding: 20,
     borderRadius: 10,
     shadowColor: "#000",
@@ -492,7 +525,7 @@ const styles = StyleSheet.create({
   summaryTitle: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#1976d2",
+    color: "black",
     marginBottom: 15,
 
   },
@@ -506,13 +539,25 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   iconStyle: {
-    color: "#1976d2",
+    color: "#65BF85",
   },
   yes: {
     color: "green",
   },
   no: {
     color: "red",
+  },
+  bordas: {
+    flexDirection: "row",
+    marginVertical: 10, // Adiciona espaço vertical
+    width: "100%", // Ocupa toda a largura
+    height: 45,
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderRadius: 10,
+    borderColor: "#65BF85",
+    paddingRight: 10,
   },
 });
 

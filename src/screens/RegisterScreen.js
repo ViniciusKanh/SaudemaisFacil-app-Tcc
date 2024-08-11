@@ -6,13 +6,11 @@ import {
   Text,
   TextInput,
   StyleSheet,
-  Switch,
-  Button,
   Platform,
   KeyboardAvoidingView,
   ScrollView,
 } from "react-native";
-import { auth, db } from "../config/firebaseConfig"; // Ajuste o caminho conforme necessário
+import { auth, db } from "../config/firebaseConfig";
 import {
   createUserWithEmailAndPassword,
   sendEmailVerification,
@@ -27,13 +25,11 @@ const RegisterScreen = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
 
-  // Função para lidar com a confirmação da data
   const handleConfirmDate = (date) => {
     setBirthDate(date);
-    setIsDatePickerVisible(false); // Fecha o DatePicker após a seleção
+    setIsDatePickerVisible(false);
   };
 
   const handleRegister = () => {
@@ -50,57 +46,28 @@ const RegisterScreen = () => {
             "Verifique seu e-mail",
             "Um e-mail de verificação foi enviado. Por favor, verifique sua caixa de entrada."
           );
-          // Limpa os campos
           setFullName("");
           setBirthDate(new Date());
           setEmail("");
           setPassword("");
           setConfirmPassword("");
-          setShowDatePicker(false);
-          // Navega de volta para a tela de login
-          navigation.navigate("Login");
+          setIsDatePickerVisible(false);
+          // Navega de volta para a tela de login (caso esteja utilizando react-navigation)
+          // navigation.navigate("Login");
         });
-        // Converta Date para Timestamp do Firebase
+
         const birthDateTimestamp = Timestamp.fromDate(birthDate);
-        // Salve os dados do usuário no Firestore
         setDoc(doc(db, "users", userCredential.user.uid), {
           fullName,
-          birthDate: birthDateTimestamp, // Use o Timestamp
-          // ... outros dados
+          birthDate: birthDateTimestamp,
         }).then(() => {
-          // ... sucesso no cadastro
+          // Sucesso no cadastro
         });
       })
       .catch((error) => {
-        // ... tratamento de erros
+        Alert.alert("Erro", error.message);
       });
   };
-
-  // Função para atualizar a data de nascimento e fechar o DatePicker
-  const onChange = (event, selectedDate) => {
-    const currentDate = selectedDate || birthDate;
-    setShowDatePicker(Platform.OS === "ios");
-    setBirthDate(currentDate);
-  };
-  const renderDatePicker = () => (
-    <View>
-      <TouchableOpacity
-        onPress={() => setShowDatePicker(true)}
-        style={styles.button}
-      >
-        <Text style={styles.label}>Data de Nascimento</Text>
-      </TouchableOpacity>
-      {showDatePicker && (
-        <DateTimePickerModal
-          isVisible={isDatePickerVisible}
-          mode="date"
-          onConfirm={handleConfirmDate}
-          onCancel={() => setIsDatePickerVisible(false)}
-          date={birthDate}
-        />
-      )}
-    </View>
-  );
 
   return (
     <KeyboardAvoidingView
@@ -134,18 +101,18 @@ const RegisterScreen = () => {
             mode="date"
             onConfirm={handleConfirmDate}
             onCancel={() => setIsDatePickerVisible(false)}
-            date={birthDate || new Date()} // Usa a data de nascimento atual ou a data atual como fallback
+            date={birthDate}
+            textColor="black" // Adiciona cor ao texto
           />
           <Text style={styles.label}>Email</Text>
-
           <TextInput
             style={styles.input}
             placeholder="Email"
             value={email}
             onChangeText={setEmail}
+            keyboardType="email-address"
           />
           <Text style={styles.label}>Senha</Text>
-
           <TextInput
             style={styles.input}
             placeholder="Senha"
@@ -154,7 +121,6 @@ const RegisterScreen = () => {
             secureTextEntry
           />
           <Text style={styles.label}>Confirme a Senha</Text>
-
           <TextInput
             style={styles.input}
             placeholder="Confirme a Senha"
@@ -176,7 +142,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     padding: 20,
-    backgroundColor: "#f7f7f7", // Cor de fundo da tela
+    backgroundColor: "#f7f7f7",
   },
   input: {
     height: 40,
@@ -186,12 +152,6 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 4,
   },
-  switchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 12,
-  },
   button: {
     backgroundColor: "#007bff",
     paddingVertical: 12,
@@ -199,25 +159,13 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     alignItems: "center",
     marginTop: 12,
-    // Ajustes para centralizar e aumentar o botão
-    alignSelf: "center", // Centraliza o botão horizontalmente
-    width: "80%", // Aumenta a largura do botão
+    alignSelf: "center",
+    width: "80%",
   },
   buttonText: {
     color: "white",
     fontSize: 18,
     fontWeight: "600",
-  },
-  datePickerButton: {
-    // Estilos para o botão do DatePicker
-    marginTop: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    backgroundColor: "#28a745", // Cor verde, você pode ajustar conforme necessário
-    borderRadius: 5,
-    alignItems: "center",
-    alignSelf: "center", // Centraliza o botão horizontalmente
-    width: "80%", // Aumenta a largura do botão
   },
   label: {
     fontSize: 16,
