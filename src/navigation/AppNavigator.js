@@ -24,6 +24,7 @@ import MedicationScreen from "../screens/Medicamento/MedicationScreen";
 import DadosSaudeSaudeScreen from "../screens/InfSaudeScreen";
 import LembretesScreen from "../screens/Lembretes/LembretesScreen";
 import RelRemindersConsultationScreen from "./../screens/Lembretes/Consulta/RelRemindersConsultationScreen";
+import RelRemindersMedicamentotionScreen from "./../screens/Lembretes/Medicamento/RelRemindersMedicationScreen";
 import HistoricoGlicemia from "../screens/DCNT/GlicemiaRellPersonalizado";
 import HistoricoPressao from "../screens/DCNT/PressaoArterialRellPersonalizado";
 import AuthNavigator from "./AuthNavigator";
@@ -382,7 +383,12 @@ export default function AppNavigator() {
           name="Consultas"
           component={RelRemindersConsultationScreen}
         />
+          <Stack.Screen
+          name="Lembrete Medicamento"
+          component={RelRemindersMedicamentotionScreen}
+        />
       </Stack.Navigator>
+      
       {/* Modal para logout */}
       <Modal
         animationType="slide"

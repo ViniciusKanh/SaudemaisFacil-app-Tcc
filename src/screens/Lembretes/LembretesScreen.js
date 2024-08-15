@@ -9,12 +9,15 @@ import {
   Platform,
 } from "react-native";
 import RemindersConsultationScreen from "./Consulta/RemindersConsultationScreen";
+import RemindersMedicationScreen from "./Medicamento/RemindersMedicationScreen";
+
 import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
 
 const LembretesScreen = ({ navigation }) => {
-  const [isModalVisible, setModalVisible] = useState(false);
+  const [isConsultationModalVisible, setConsultationModalVisible] = useState(false);
+  const [isMedicationModalVisible, setMedicationModalVisible] = useState(false); // Estado para o modal de medicamentos
 
   useEffect(() => {
     registerForPushNotificationsAsync().then(token => {
@@ -36,9 +39,15 @@ const LembretesScreen = ({ navigation }) => {
     };
   }, []);
 
-  const openModal = () => setModalVisible(true);
-  const closeModal = () => setModalVisible(false);
+  const openConsultationModal = () => setConsultationModalVisible(true);
+  const closeConsultationModal = () => setConsultationModalVisible(false);
+
+  const openMedicationModal = () => setMedicationModalVisible(true); // Abre o modal de medicamentos
+  const closeMedicationModal = () => setMedicationModalVisible(false); // Fecha o modal de medicamentos
+
   const navigateToRelReminders = () => navigation.navigate("Consultas");
+  const navigateToRelRemindersMedication = () => navigation.navigate("Lembrete Medicamento");
+
 
   const sendTestNotification = async () => {
     try {
@@ -94,17 +103,20 @@ const LembretesScreen = ({ navigation }) => {
       <View style={styles.content}>
         <Text style={styles.cardTitle}>Medicamentos</Text>
         <View style={styles.card}>
-          <TouchableOpacity style={styles.button} onPress={() => {}}>
+          <TouchableOpacity style={styles.button} onPress={openMedicationModal}>
             <Text style={styles.buttonText}>Registrar</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.button} onPress={() => {}}>
+          <TouchableOpacity
+            style={styles.button}
+            onPress={navigateToRelRemindersMedication}
+          >
             <Text style={styles.buttonText}>Visualizar</Text>
           </TouchableOpacity>
         </View>
 
         <Text style={styles.cardTitle}>Consultas</Text>
         <View style={styles.card}>
-          <TouchableOpacity style={styles.button} onPress={openModal}>
+          <TouchableOpacity style={styles.button} onPress={openConsultationModal}>
             <Text style={styles.buttonText}>Registrar</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -113,13 +125,17 @@ const LembretesScreen = ({ navigation }) => {
           >
             <Text style={styles.buttonText}>Visualizar</Text>
           </TouchableOpacity>
-         
         </View>
       </View>
 
       <RemindersConsultationScreen
-        isVisible={isModalVisible}
-        onClose={closeModal}
+        isVisible={isConsultationModalVisible}
+        onClose={closeConsultationModal}
+      />
+
+      <RemindersMedicationScreen
+        isVisible={isMedicationModalVisible} // Vincula ao estado de visibilidade
+        onClose={closeMedicationModal} // Passa a função para fechar o modal
       />
     </SafeAreaView>
   );
