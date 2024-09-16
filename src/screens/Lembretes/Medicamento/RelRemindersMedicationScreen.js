@@ -39,7 +39,7 @@ const RemindersMedicationViewScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = getAuth().onAuthStateChanged(user => {
+    const unsubscribe = getAuth().onAuthStateChanged((user) => {
       if (user) fetchReminders();
     });
     return () => unsubscribe();
@@ -64,8 +64,8 @@ const RemindersMedicationViewScreen = () => {
     for (const docSnapshot of querySnapshot.docs) {
       const reminderData = docSnapshot.data();
       const reminderTime = moment(reminderData.reminderTime);
-      const status = reminderTime.isBefore(moment().subtract(1, 'hours'))
-        ? 'Tomado em Atraso'
+      const status = reminderTime.isBefore(moment().subtract(1, "hours"))
+        ? "Tomado em Atraso"
         : reminderData.status;
 
       const medicationDocRef = doc(db, "medications", reminderData.medicationId);
@@ -78,12 +78,15 @@ const RemindersMedicationViewScreen = () => {
         medicationData,
         formattedDate: reminderTime.format("DD/MM/YYYY"),
         formattedTime: reminderTime.format("HH:mm"),
-        Status: status
+        Status: status,
       });
     }
 
+    // Agrupando lembretes
     const sections = allReminders.reduce((acc, reminder) => {
-      const medicationSection = acc.find(section => section.title === reminder.medicationData.name);
+      const medicationSection = acc.find(
+        (section) => section.title === reminder.medicationData.name
+      );
       if (medicationSection) {
         medicationSection.data.push(reminder);
       } else {
@@ -96,13 +99,23 @@ const RemindersMedicationViewScreen = () => {
     }, []);
 
     // Ordenar e organizar lembretes em subseções dentro de cada medicamento
-    const sortedSections = sections.map(section => {
-      const pendingReminders = section.data.filter(reminder => reminder.Status !== 'Tomado' && reminder.Status !== 'Tomado em Atraso');
-      const completedReminders = section.data.filter(reminder => reminder.Status === 'Tomado' || reminder.Status === 'Tomado em Atraso');
+    const sortedSections = sections.map((section) => {
+      const pendingReminders = section.data.filter(
+        (reminder) => reminder.Status !== "Tomado" && reminder.Status !== "Tomado em Atraso"
+      );
+      const completedReminders = section.data.filter(
+        (reminder) => reminder.Status === "Tomado"
+      );
+      const lateReminders = section.data.filter(
+        (reminder) => reminder.Status === "Tomado em Atraso"
+      );
 
       return {
         ...section,
-        data: pendingReminders.concat({ title: "Concluídos", data: completedReminders }),
+        data: pendingReminders.concat(
+          { title: "Tomado em Atraso", data: lateReminders },
+          { title: "Concluídos", data: completedReminders }
+        ),
       };
     });
 
@@ -114,16 +127,32 @@ const RemindersMedicationViewScreen = () => {
     fetchReminders().finally(() => setRefreshing(false));
   };
 
+
+
+  const handleMarkAsTaken = async (reminder) => {
+    try {
+      const newStatus = moment(reminder.reminderTime).isBefore(
+        moment().subtract(1, "hours")
+      )
+        ? "Tomado em Atraso"
+        : "Tomado";
+  
+      await updateDoc(doc(db, "remindersMedication", reminder.id), { status: newStatus });
+      
+      // Atualiza a lista de lembretes após a marcação
+      fetchReminders(); 
+    } catch (error) {
+      console.error("Erro ao atualizar status do lembrete: ", error);
+    }
+  };
+  
   const handleDelete = async (id) => {
     try {
-      // Confirmando que o ID está correto e não indefinido
       if (id) {
         await deleteDoc(doc(db, "remindersMedication", id));
-        // Atualizando o estado para remover o lembrete excluído
-        setReminders(reminders => reminders.map(section => ({
-          ...section,
-          data: section.data.filter(reminder => reminder.id !== id),
-        })));
+  
+        // Atualiza a lista de lembretes após a exclusão
+        fetchReminders(); 
       } else {
         console.error("ID inválido para exclusão:", id);
       }
@@ -131,19 +160,7 @@ const RemindersMedicationViewScreen = () => {
       console.error("Erro ao deletar lembrete: ", error);
     }
   };
-
-  const handleMarkAsTaken = async (reminder) => {
-    try {
-      const newStatus = moment(reminder.reminderTime).isBefore(moment().subtract(1, 'hours'))
-        ? "Tomado em Atraso"
-        : "Tomado";
-
-      await updateDoc(doc(db, "remindersMedication", reminder.id), { status: newStatus });
-      onRefresh();
-    } catch (error) {
-      console.error("Erro ao atualizar status do lembrete: ", error);
-    }
-  };
+  
 
   const renderSectionHeader = ({ section: { title } }) => (
     <Text style={styles.sectionTitle}>{title}</Text>
@@ -154,95 +171,89 @@ const RemindersMedicationViewScreen = () => {
       return (
         <View>
           <Text style={styles.subSectionTitle}>{item.title}</Text>
-          {item.data.map(reminder => renderItem({ item: reminder }))}
+          {item.data.map((reminder) => (
+            <View key={reminder.id}>{renderItem({ item: reminder })}</View>
+          ))}
         </View>
       );
     }
-
+  
     const isTaken = item.Status === "Tomado";
     const isLate = item.Status === "Tomado em Atraso";
-
+  
     const MedicationIcon = item.medicationData?.form
-    ? {
-        Pill: PillIcon,
-        Capsule: CapsuleIcon,
-        Potinho: PoteIcon,
-        ComprimidoRetangular: ComprimidoRetangularIcon,
-        Injecao: InjecaoIcon,
-        Adesivo: AdesivoIcon,
-        Cream: CremeIcon,
-        Spray: SprayIcon,
-      }[item.medicationData.form]
-    : null;
-
+      ? {
+          Pill: PillIcon,
+          Capsule: CapsuleIcon,
+          Potinho: PoteIcon,
+          ComprimidoRetangular: ComprimidoRetangularIcon,
+          Injecao: InjecaoIcon,
+          Adesivo: AdesivoIcon,
+          Cream: CremeIcon,
+          Spray: SprayIcon,
+        }[item.medicationData.form]
+      : null;
+  
     return (
-        <View
-          style={[
-            styles.card,
-            isTaken && styles.cardTaken,
-            isLate && styles.cardLate,
-          ]}
-        >
-          <View style={styles.cardHeader}>
-            <View style={styles.cardDetails}>
-              {item.medicationData?.imageUrl ? (
-                <Image
-                  source={{ uri: item.medicationData.imageUrl }}
-                  style={styles.medicationImage}
-                />
-              ) : (
-                <View style={styles.placeholderImage} /> // Placeholder para caso a imagem não exista
-              )}
-              <View style={styles.medicationInfo}>
-                <Text style={styles.medicationName}>
-                  {item.medicationData?.name || "Nome não disponível"}
-                </Text>
-                <Text style={styles.medicationDetails}>
-                  Dosagem: {item.medicationData?.dosage || "N/A"}
-                </Text>
-                <Text style={styles.medicationDetails}>
-                  Tipo: {item.medicationData?.type || "N/A"}
-                </Text>
-              </View>
-              {MedicationIcon && (
-                <MedicationIcon
-                  color={item.medicationData?.color || "#000"}
-                  size={50}
-                  style={styles.medicationIcon}
-                />
-              )}
+      <View style={[styles.card, isTaken && styles.cardTaken, isLate && styles.cardLate]}>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardDetails}>
+            {item.medicationData?.imageUrl ? (
+              <Image
+                source={{ uri: item.medicationData.imageUrl }}
+                style={styles.medicationImage}
+              />
+            ) : (
+              <View style={styles.placeholderImage} />
+            )}
+            <View style={styles.medicationInfo}>
+              <Text style={styles.medicationName}>
+                {item.medicationData?.name || "Nome não disponível"}
+              </Text>
+              <Text style={styles.medicationDetails}>
+                Dosagem: {item.medicationData?.dosage || "N/A"}
+              </Text>
+              <Text style={styles.medicationDetails}>
+                Tipo: {item.medicationData?.type || "N/A"}
+              </Text>
             </View>
-            <TouchableOpacity
-              onPress={() => handleDelete(item.id)}
-              style={styles.trashIcon}
-            >
-              <Icon name="trash" size={24} color="red" />
-            </TouchableOpacity>
-          </View>
-          <View style={styles.cardFooter}>
-            <Text style={styles.reminderTime}>
-              {item.formattedDate} às {item.formattedTime}
-            </Text>
-            {!isTaken && (
-              <TouchableOpacity
-                onPress={() => handleMarkAsTaken(item)}
-                style={styles.takenButton}
-              >
-                <Text style={styles.buttonText}>Medicamento Tomado</Text>
-              </TouchableOpacity>
+            {MedicationIcon && (
+              <MedicationIcon
+                color={item.medicationData?.color || "#000"}
+                size={50}
+                style={styles.medicationIcon}
+              />
             )}
           </View>
-          {isTaken && <View style={styles.strikeThrough} />}
-          {isLate && (
-            <>
-              <View style={styles.strikeThrough} />
-              <View style={styles.strikeThroughX} />
-            </>
+          {/* Exibir botão de exclusão para todos os lembretes */}
+          <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.trashIcon}>
+            <Icon name="trash" size={24} color="red" />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.cardFooter}>
+          <Text style={styles.reminderTime}>
+            {item.formattedDate} às {item.formattedTime}
+          </Text>
+          {!isTaken && (
+            <TouchableOpacity
+              onPress={() => handleMarkAsTaken(item)}
+              style={styles.takenButton}
+            >
+              <Text style={styles.buttonText}>Medicamento Tomado</Text>
+            </TouchableOpacity>
           )}
         </View>
-      );
-    };
-
+        {isTaken && <View style={styles.strikeThrough} />}
+        {isLate && (
+          <>
+            <View style={styles.strikeThrough} />
+            <View style={styles.strikeThroughX} />
+          </>
+        )}
+      </View>
+    );
+  };
+  
   return (
     <View style={styles.container}>
       <SectionList
@@ -256,6 +267,7 @@ const RemindersMedicationViewScreen = () => {
   );
 };
 
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -263,13 +275,13 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginTop: 10,
     marginBottom: 5,
   },
   subSectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginTop: 5,
     marginBottom: 5,
     marginLeft: 15,
@@ -290,7 +302,7 @@ const styles = StyleSheet.create({
   },
   cardLate: {
     opacity: 0.4,
-    borderColor: 'red',
+    borderColor: "red",
     borderWidth: 2,
   },
   cardHeader: {
@@ -302,7 +314,7 @@ const styles = StyleSheet.create({
   cardDetails: {
     flexDirection: "row",
     alignItems: "center",
-    flex: 1, 
+    flex: 1,
   },
   medicationImage: {
     width: 50,
@@ -315,7 +327,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   medicationIcon: {
-    marginLeft: 10, 
+    marginLeft: 10,
   },
   medicationName: {
     fontSize: 18,
@@ -326,7 +338,7 @@ const styles = StyleSheet.create({
     color: "#666",
   },
   trashIcon: {
-    marginLeft: 15, 
+    marginLeft: 15,
   },
   cardFooter: {
     alignItems: "center",
@@ -349,21 +361,21 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   strikeThrough: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
-    top: '50%',
-    width: '100%',
+    top: "50%",
+    width: "100%",
     height: 2,
-    backgroundColor: 'black',
+    backgroundColor: "black",
   },
   strikeThroughX: {
-    position: 'absolute',
-    left: '50%',
+    position: "absolute",
+    left: "50%",
     top: 0,
     width: 2,
-    height: '100%',
-    backgroundColor: 'black',
-    transform: [{ rotate: '-45deg' }],
+    height: "100%",
+    backgroundColor: "black",
+    transform: [{ rotate: "-45deg" }],
   },
 });
 

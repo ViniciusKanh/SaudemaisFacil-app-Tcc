@@ -10,7 +10,7 @@ import {
   Image,
 } from "react-native";
 import { db } from "../../../config/firebaseConfig";
-import { collection, addDoc, getDocs } from "firebase/firestore";
+import { collection, addDoc, getDocs, deleteDoc, doc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import * as Notifications from 'expo-notifications';
@@ -102,40 +102,70 @@ const RemindersMedicationScreen = ({ isVisible, onClose }) => {
 
   const saveReminders = async (reminders) => {
     try {
+      const now = new Date(); // Obtém o momento atual
+  
       for (const reminder of reminders) {
-        // Salvar no Firestore
-        await addDoc(collection(db, "remindersMedication"), {
-          userId: user.uid,
-          medicationId: selectedMedication.id,
-          medicationName: selectedMedication.name,
-          reminderTime: reminder.toISOString(),
-          status: "Pendente",
+        const reminderDate = new Date(reminder);
+  
+        // Verifica se a data do lembrete é no futuro, considerando milissegundos
+        if (reminderDate.getTime() <= now.getTime()) {
+          alert("Não é possível agendar uma notificação para uma data ou hora no passado.");
+          continue; // Ignora lembretes no passado e continua com os futuros
+        }
+  
+// Salvando lembretes como "Pendente"
+await addDoc(collection(db, "remindersMedication"), {
+  userId: user.uid,
+  medicationId: selectedMedication.id,
+  medicationName: selectedMedication.name,
+  reminderTime: reminderDate.toISOString(),
+  status: "Pendente", // Mantenha o status como string
+});
+
+  
+        const reminderTimeFormatted = reminderDate.toLocaleTimeString("pt-BR", {
+          hour: '2-digit',
+          minute: '2-digit',
         });
   
         // Agendar a notificação
         await Notifications.scheduleNotificationAsync({
           content: {
             title: "Hora do medicamento!",
-            body: `Está na hora de tomar o medicamento: ${selectedMedication.name}`,
+            body: `Está na hora de tomar o medicamento: ${selectedMedication.name} às ${reminderTimeFormatted} no Saude+Facil`,
             data: { reminder },
           },
           trigger: {
-            date: new Date(reminder), // Data e hora para disparar a notificação
+            date: reminderDate,
           },
         });
       }
+  
       alert("Lembretes e notificações criados com sucesso!");
-      
+  
       // Limpar campos após salvar
       setSelectedMedication(null);
       setFinalDate(new Date());
       setStartTime(new Date());
       setIntervalHours("");
-      
+  
       onClose(); // Fecha o modal após salvar
     } catch (error) {
       console.error("Erro ao salvar lembretes: ", error);
       alert("Erro ao salvar lembretes.");
+    }
+  };
+  
+
+  // Função de exclusão de lembretes
+  const deleteReminder = async (id) => {
+    try {
+      await deleteDoc(doc(db, "remindersMedication", id));
+      alert("Lembrete excluído com sucesso!");
+      loadMedications(); // Recarrega os lembretes após exclusão
+    } catch (error) {
+      console.error("Erro ao excluir o lembrete: ", error);
+      alert("Erro ao excluir o lembrete.");
     }
   };
 
@@ -386,6 +416,17 @@ const styles = StyleSheet.create({
   },
   selectedCard: {
     backgroundColor: "#cce5ff",
+  },
+  deleteButton: {
+    backgroundColor: "#dc3545",
+    padding: 8,
+    borderRadius: 10,
+    marginTop: 10,
+    alignItems: "center",
+  },
+  deleteButtonText: {
+    color: "white",
+    fontSize: 14,
   },
 });
 

@@ -71,6 +71,7 @@
     "react-native-svg": "15.2.0",
     "react-native-tab-view": "^3.5.2",
     "react-native-vector-icons": "^10.1.0",
+    "saudemaisfacil": "file:",
     "xlsx": "^0.18.5",
     "yet": "^0.1.0"
   },
