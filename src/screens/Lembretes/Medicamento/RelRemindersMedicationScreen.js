@@ -299,11 +299,15 @@ const styles = StyleSheet.create({
   },
   cardTaken: {
     opacity: 0.6,
+    borderColor: "blue",
+    borderWidth: 7,
+
+
   },
   cardLate: {
     opacity: 0.4,
     borderColor: "red",
-    borderWidth: 2,
+    borderWidth: 6,
   },
   cardHeader: {
     flexDirection: "row",
@@ -363,17 +367,17 @@ const styles = StyleSheet.create({
   strikeThrough: {
     position: "absolute",
     left: 0,
-    top: "50%",
-    width: "100%",
+    top: "0%",
+    width: "0%",
     height: 2,
     backgroundColor: "black",
   },
   strikeThroughX: {
     position: "absolute",
-    left: "50%",
+    left: "0%",
     top: 0,
     width: 2,
-    height: "100%",
+    height: "0%",
     backgroundColor: "black",
     transform: [{ rotate: "-45deg" }],
   },

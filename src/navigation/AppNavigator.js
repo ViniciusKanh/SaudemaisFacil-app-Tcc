@@ -379,6 +379,7 @@ const fetchMedicationReminders = async () => {
         <Stack.Screen name="Historico Glicemia" component={HistoricoGlicemia} />
         <Stack.Screen name="Historico Pressão Arterial" component={HistoricoPressao} />
         <Stack.Screen name="Consultas" component={RelRemindersConsultationScreen} />
+        <Stack.Screen name="Informações Saúde" component={DadosSaudeSaudeScreen} />
         <Stack.Screen name="Lembrete Medicamento" component={RelRemindersMedicamentotionScreen} />
       </Stack.Navigator>
 
