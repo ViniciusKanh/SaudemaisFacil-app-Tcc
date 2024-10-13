@@ -4,9 +4,12 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  FlatList,
+  ActivityIndicator,
+  RefreshControl,
   SectionList,
   Image,
-  RefreshControl,
+  ScrollView
 } from "react-native";
 import { db } from "../../../config/firebaseConfig";
 import {
@@ -22,6 +25,7 @@ import {
 } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import moment from "moment";
+import 'moment/locale/pt-br';
 import Icon from "react-native-vector-icons/FontAwesome5";
 import {
   CapsuleIcon,
@@ -37,18 +41,32 @@ import {
 const RemindersMedicationViewScreen = () => {
   const [reminders, setReminders] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);  // Loader enquanto carrega
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [currentWeek, setCurrentWeek] = useState([]);
+  const TOLERANCE_MINUTES = 30; // Tolerância em minutos
 
   useEffect(() => {
-    const unsubscribe = getAuth().onAuthStateChanged((user) => {
-      if (user) fetchReminders();
-    });
-    return () => unsubscribe();
-  }, []);
+    moment.locale('pt-br'); // Configura o moment.js para PT-BR
+    generateWeekDates(selectedDate);
+    fetchReminders();
+  }, [selectedDate]);
+
+  const generateWeekDates = (selectedDate) => {
+    const startOfWeek = moment(selectedDate).startOf("week").toDate();
+    const weekDates = [];
+    for (let i = 0; i < 7; i++) {
+      weekDates.push(moment(startOfWeek).add(i, "days").toDate());
+    }
+    setCurrentWeek(weekDates);
+  };
 
   const fetchReminders = async () => {
+    setLoading(true);  // Exibe o loader
     const user = getAuth().currentUser;
     if (!user) {
       console.log("Nenhum usuário autenticado.");
+      setLoading(false);  // Remove o loader
       return;
     }
 
@@ -64,9 +82,14 @@ const RemindersMedicationViewScreen = () => {
     for (const docSnapshot of querySnapshot.docs) {
       const reminderData = docSnapshot.data();
       const reminderTime = moment(reminderData.reminderTime);
-      const status = reminderTime.isBefore(moment().subtract(1, "hours"))
-        ? "Tomado em Atraso"
-        : reminderData.status;
+      const timeDifference = moment().diff(reminderTime, 'minutes');
+      const isLate = timeDifference > TOLERANCE_MINUTES;
+
+      const status = isLate
+        ? "Não Tomado"
+        : reminderData.status === "Tomado"
+        ? "Tomado"
+        : "Pendente";
 
       const medicationDocRef = doc(db, "medications", reminderData.medicationId);
       const medicationDoc = await getDoc(medicationDocRef);
@@ -82,44 +105,22 @@ const RemindersMedicationViewScreen = () => {
       });
     }
 
-    // Agrupando lembretes
-    const sections = allReminders.reduce((acc, reminder) => {
-      const medicationSection = acc.find(
-        (section) => section.title === reminder.medicationData.name
-      );
-      if (medicationSection) {
-        medicationSection.data.push(reminder);
-      } else {
-        acc.push({
-          title: reminder.medicationData.name,
-          data: [reminder],
-        });
-      }
-      return acc;
-    }, []);
+    const filteredReminders = allReminders.filter(
+      (reminder) => moment(reminder.reminderTime).isSame(selectedDate, "day")
+    );
 
-    // Ordenar e organizar lembretes em subseções dentro de cada medicamento
-    const sortedSections = sections.map((section) => {
-      const pendingReminders = section.data.filter(
-        (reminder) => reminder.Status !== "Tomado" && reminder.Status !== "Tomado em Atraso"
-      );
-      const completedReminders = section.data.filter(
-        (reminder) => reminder.Status === "Tomado"
-      );
-      const lateReminders = section.data.filter(
-        (reminder) => reminder.Status === "Tomado em Atraso"
-      );
+    // Separar lembretes por status: Pendentes, Não Tomados e Tomados
+    const pendingReminders = filteredReminders.filter(reminder => reminder.Status === "Pendente");
+    const notTakenReminders = filteredReminders.filter(reminder => reminder.Status === "Não Tomado");
+    const completedReminders = filteredReminders.filter(reminder => reminder.Status === "Tomado");
 
-      return {
-        ...section,
-        data: pendingReminders.concat(
-          { title: "Tomado em Atraso", data: lateReminders },
-          { title: "Concluídos", data: completedReminders }
-        ),
-      };
-    });
+    setReminders([
+      { title: "Pendentes", data: pendingReminders },
+      { title: "Não Tomados", data: notTakenReminders },
+      { title: "Tomados", data: completedReminders },
+    ]);
 
-    setReminders(sortedSections);
+    setLoading(false);  // Remove o loader após carregar
   };
 
   const onRefresh = () => {
@@ -127,32 +128,20 @@ const RemindersMedicationViewScreen = () => {
     fetchReminders().finally(() => setRefreshing(false));
   };
 
-
-
   const handleMarkAsTaken = async (reminder) => {
     try {
-      const newStatus = moment(reminder.reminderTime).isBefore(
-        moment().subtract(1, "hours")
-      )
-        ? "Tomado em Atraso"
-        : "Tomado";
-  
-      await updateDoc(doc(db, "remindersMedication", reminder.id), { status: newStatus });
-      
-      // Atualiza a lista de lembretes após a marcação
-      fetchReminders(); 
+      await updateDoc(doc(db, "remindersMedication", reminder.id), { status: "Tomado" });
+      fetchReminders(); // Atualiza automaticamente após a ação
     } catch (error) {
       console.error("Erro ao atualizar status do lembrete: ", error);
     }
   };
-  
+
   const handleDelete = async (id) => {
     try {
       if (id) {
         await deleteDoc(doc(db, "remindersMedication", id));
-  
-        // Atualiza a lista de lembretes após a exclusão
-        fetchReminders(); 
+        fetchReminders(); // Atualiza automaticamente após a exclusão
       } else {
         console.error("ID inválido para exclusão:", id);
       }
@@ -160,27 +149,34 @@ const RemindersMedicationViewScreen = () => {
       console.error("Erro ao deletar lembrete: ", error);
     }
   };
-  
 
-  const renderSectionHeader = ({ section: { title } }) => (
-    <Text style={styles.sectionTitle}>{title}</Text>
-  );
+  const handlePreviousWeek = () => {
+    const newDate = moment(selectedDate).subtract(1, "week").toDate();
+    setSelectedDate(newDate);
+  };
 
-  const renderItem = ({ item }) => {
-    if (item.data) {
-      return (
-        <View>
-          <Text style={styles.subSectionTitle}>{item.title}</Text>
-          {item.data.map((reminder) => (
-            <View key={reminder.id}>{renderItem({ item: reminder })}</View>
-          ))}
-        </View>
-      );
-    }
-  
+  const handleNextWeek = () => {
+    const newDate = moment(selectedDate).add(1, "week").toDate();
+    setSelectedDate(newDate);
+  };
+
+  const renderDateItem = ({ item }) => {
+    const isSelected = moment(item).isSame(selectedDate, "day");
+    return (
+      <TouchableOpacity
+        style={[styles.dateItem, isSelected && styles.dateItemSelected]}
+        onPress={() => setSelectedDate(item)}
+      >
+        <Text style={[styles.dateText, isSelected && styles.dateTextSelected]}>{moment(item).format("D")}</Text>
+        <Text style={[styles.dayText, isSelected && styles.dateTextSelected]}>{moment(item).format("ddd").toUpperCase()}</Text>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderReminder = (item) => {
     const isTaken = item.Status === "Tomado";
-    const isLate = item.Status === "Tomado em Atraso";
-  
+    const isLate = item.Status === "Não Tomado";
+
     const MedicationIcon = item.medicationData?.form
       ? {
           Pill: PillIcon,
@@ -193,9 +189,9 @@ const RemindersMedicationViewScreen = () => {
           Spray: SprayIcon,
         }[item.medicationData.form]
       : null;
-  
+
     return (
-      <View style={[styles.card, isTaken && styles.cardTaken, isLate && styles.cardLate]}>
+      <View key={item.id} style={[styles.card, isTaken && styles.cardTaken, isLate && styles.cardLate]}>
         <View style={styles.cardHeader}>
           <View style={styles.cardDetails}>
             {item.medicationData?.imageUrl ? (
@@ -225,7 +221,6 @@ const RemindersMedicationViewScreen = () => {
               />
             )}
           </View>
-          {/* Exibir botão de exclusão para todos os lembretes */}
           <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.trashIcon}>
             <Icon name="trash" size={24} color="red" />
           </TouchableOpacity>
@@ -235,56 +230,119 @@ const RemindersMedicationViewScreen = () => {
             {item.formattedDate} às {item.formattedTime}
           </Text>
           {!isTaken && (
-            <TouchableOpacity
-              onPress={() => handleMarkAsTaken(item)}
-              style={styles.takenButton}
-            >
+            <TouchableOpacity onPress={() => handleMarkAsTaken(item)} style={styles.takenButton}>
               <Text style={styles.buttonText}>Medicamento Tomado</Text>
             </TouchableOpacity>
           )}
         </View>
-        {isTaken && <View style={styles.strikeThrough} />}
-        {isLate && (
-          <>
-            <View style={styles.strikeThrough} />
-            <View style={styles.strikeThroughX} />
-          </>
-        )}
       </View>
     );
   };
-  
+
   return (
     <View style={styles.container}>
-      <SectionList
-        sections={reminders}
-        keyExtractor={(item) => (item.id ? item.id.toString() : Math.random().toString())}
-        renderItem={renderItem}
-        renderSectionHeader={renderSectionHeader}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-      />
+      <View style={styles.monthYearHeader}>
+        <Text style={styles.monthText}>{moment(selectedDate).format("MMMM YYYY")}</Text>
+      </View>
+      <View style={styles.weekSelector}>
+        <TouchableOpacity onPress={handlePreviousWeek} style={styles.arrowButton}>
+          <Icon name="chevron-left" size={24} color="#28a745" />
+        </TouchableOpacity>
+        <FlatList
+          horizontal
+          data={currentWeek}
+          renderItem={renderDateItem}
+          keyExtractor={(item) => item.toString()}
+          contentContainerStyle={styles.dateList}
+        />
+        <TouchableOpacity onPress={handleNextWeek} style={styles.arrowButton}>
+          <Icon name="chevron-right" size={24} color="#28a745" />
+        </TouchableOpacity>
+      </View>
+
+      {loading ? (
+        <ActivityIndicator size="large" color="#28a745" style={styles.loader} />
+      ) : (
+        <ScrollView
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        >
+          {reminders.map((section, index) => (
+            <View key={index} style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>{section.title}</Text>
+              {section.data.length > 0 ? (
+                section.data.map((item) => renderReminder(item))
+              ) : (
+                <Text style={styles.noRemindersText}>Nenhum lembrete encontrado.</Text>
+              )}
+            </View>
+          ))}
+        </ScrollView>
+      )}
     </View>
   );
 };
-
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 10,
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginTop: 10,
-    marginBottom: 5,
+  loader: {
+    marginTop: 20,
   },
-  subSectionTitle: {
+  monthYearHeader: {
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  monthText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  weekSelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  dateList: {
+    flexGrow: 1,
+    justifyContent: "space-around",
+  },
+  arrowButton: {
+    padding: 10,
+  },
+  dateItem: {
+    padding: 10,
+    borderRadius: 5,
+    backgroundColor: "#e0e0e0",
+    marginHorizontal: 5,
+    alignItems: "center",
+  },
+  dateItemSelected: {
+    backgroundColor: "#28a745",
+  },
+  dateText: {
+    fontSize: 16,
+    color: "#333",
+  },
+  dateTextSelected: {
+    color: "#fff",
+  },
+  dayText: {
+    fontSize: 14,
+    color: "#666",
+  },
+  sectionContainer: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
     fontSize: 18,
-    fontWeight: "bold",
-    marginTop: 5,
-    marginBottom: 5,
-    marginLeft: 15,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  noRemindersText: {
+    fontSize: 14,
+    color: "#666",
   },
   card: {
     backgroundColor: "#FFF",
@@ -301,8 +359,6 @@ const styles = StyleSheet.create({
     opacity: 0.6,
     borderColor: "blue",
     borderWidth: 7,
-
-
   },
   cardLate: {
     opacity: 0.4,
@@ -363,23 +419,6 @@ const styles = StyleSheet.create({
   buttonText: {
     color: "#FFFFFF",
     fontWeight: "bold",
-  },
-  strikeThrough: {
-    position: "absolute",
-    left: 0,
-    top: "0%",
-    width: "0%",
-    height: 2,
-    backgroundColor: "black",
-  },
-  strikeThroughX: {
-    position: "absolute",
-    left: "0%",
-    top: 0,
-    width: 2,
-    height: "0%",
-    backgroundColor: "black",
-    transform: [{ rotate: "-45deg" }],
   },
 });
 

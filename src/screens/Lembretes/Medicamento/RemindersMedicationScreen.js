@@ -8,12 +8,14 @@ import {
   FlatList,
   TextInput,
   Image,
+  Alert,
 } from "react-native";
 import { db } from "../../../config/firebaseConfig";
-import { collection, addDoc, getDocs, deleteDoc, doc } from "firebase/firestore";
+import { collection, addDoc, getDocs, deleteDoc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import * as Notifications from 'expo-notifications';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view'; // Importante
 
 import {
   CapsuleIcon,
@@ -92,6 +94,12 @@ const RemindersMedicationScreen = ({ isVisible, onClose }) => {
     const endDate = new Date(finalDate);
     const intervalMs = parseInt(intervalHours) * 60 * 60 * 1000;
 
+    // Verifica se a data final está no passado
+    if (endDate < new Date().setHours(0, 0, 0, 0)) {
+      alert("A data final não pode ser no passado.");
+      return;
+    }
+
     while (currentDate <= endDate) {
       reminders.push(new Date(currentDate));
       currentDate.setTime(currentDate.getTime() + intervalMs);
@@ -103,31 +111,30 @@ const RemindersMedicationScreen = ({ isVisible, onClose }) => {
   const saveReminders = async (reminders) => {
     try {
       const now = new Date(); // Obtém o momento atual
-  
+
       for (const reminder of reminders) {
         const reminderDate = new Date(reminder);
-  
-        // Verifica se a data do lembrete é no futuro, considerando milissegundos
-        if (reminderDate.getTime() <= now.getTime()) {
-          alert("Não é possível agendar uma notificação para uma data ou hora no passado.");
-          continue; // Ignora lembretes no passado e continua com os futuros
-        }
-  
-// Salvando lembretes como "Pendente"
-await addDoc(collection(db, "remindersMedication"), {
-  userId: user.uid,
-  medicationId: selectedMedication.id,
-  medicationName: selectedMedication.name,
-  reminderTime: reminderDate.toISOString(),
-  status: "Pendente", // Mantenha o status como string
-});
 
-  
+        // Permitir lembretes somente em datas futuras
+        if (reminderDate.getTime() <= now.getTime()) {
+          Alert.alert("Erro", "Não é possível agendar uma notificação para uma data ou hora no passado.");
+          continue;  // Ignora lembretes no passado
+        }
+
+        // Salvando lembretes como "Pendente"
+        await addDoc(collection(db, "remindersMedication"), {
+          userId: user.uid,
+          medicationId: selectedMedication.id,
+          medicationName: selectedMedication.name,
+          reminderTime: reminderDate.toISOString(),
+          status: "Pendente", // Mantenha o status como string
+        });
+
         const reminderTimeFormatted = reminderDate.toLocaleTimeString("pt-BR", {
           hour: '2-digit',
           minute: '2-digit',
         });
-  
+
         // Agendar a notificação
         await Notifications.scheduleNotificationAsync({
           content: {
@@ -140,48 +147,33 @@ await addDoc(collection(db, "remindersMedication"), {
           },
         });
       }
-  
-      alert("Lembretes e notificações criados com sucesso!");
-  
+
+      Alert.alert("Sucesso", "Lembretes e notificações criados com sucesso!");
+
       // Limpar campos após salvar
       setSelectedMedication(null);
       setFinalDate(new Date());
       setStartTime(new Date());
       setIntervalHours("");
-  
+
       onClose(); // Fecha o modal após salvar
     } catch (error) {
       console.error("Erro ao salvar lembretes: ", error);
-      alert("Erro ao salvar lembretes.");
+      Alert.alert("Erro", "Erro ao salvar lembretes.");
     }
-  };
-  
-
-  // Função de exclusão de lembretes
-  const deleteReminder = async (id) => {
-    try {
-      await deleteDoc(doc(db, "remindersMedication", id));
-      alert("Lembrete excluído com sucesso!");
-      loadMedications(); // Recarrega os lembretes após exclusão
-    } catch (error) {
-      console.error("Erro ao excluir o lembrete: ", error);
-      alert("Erro ao excluir o lembrete.");
-    }
-  };
-
-  const IconComponents = {
-    Pill: PillIcon,
-    Capsule: CapsuleIcon,
-    Potinho: PoteIcon,
-    ComprimidoRetangular: ComprimidoRetangularIcon,
-    Injecao: InjecaoIcon,
-    Adesivo: AdesivoIcon,
-    Cream: CremeIcon,
-    Spray: SprayIcon,
   };
 
   const renderMedicationCard = ({ item }) => {
-    const MedicationIcon = IconComponents[item.form];
+    const MedicationIcon = {
+      Pill: PillIcon,
+      Capsule: CapsuleIcon,
+      Potinho: PoteIcon,
+      ComprimidoRetangular: ComprimidoRetangularIcon,
+      Injecao: InjecaoIcon,
+      Adesivo: AdesivoIcon,
+      Cream: CremeIcon,
+      Spray: SprayIcon,
+    }[item.form];
 
     return (
       <TouchableOpacity
@@ -201,17 +193,11 @@ await addDoc(collection(db, "remindersMedication"), {
         </View>
         <View style={styles.medicationInfo}>
           <Text style={styles.medicationName}>{item.name}</Text>
-          <Text style={styles.medicationDetails}>
-            Dosagem: {item.dosage}
-          </Text>
-          <Text style={styles.medicationDetails}>
-            Concentração: {item.concentration}
-          </Text>
-          <View style={styles.medicationFooter}>
-            {MedicationIcon && (
-              <MedicationIcon color={item.color} size={30} style={styles.medicationIcon} />
-            )}
-          </View>
+          <Text style={styles.medicationDetails}>Dosagem: {item.dosage}</Text>
+          <Text style={styles.medicationDetails}>Concentração: {item.concentration}</Text>
+          {MedicationIcon && (
+            <MedicationIcon color={item.color} size={30} style={styles.medicationIcon} />
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -219,72 +205,102 @@ await addDoc(collection(db, "remindersMedication"), {
 
   return (
     <Modal animationType="slide" transparent={true} visible={isVisible}>
-      <View style={styles.modalView}>
-        <Text style={styles.modalTitle}>Adicionar Lembrete de Medicamento</Text>
-        <FlatList
-          data={medications}
-          renderItem={renderMedicationCard}
-          keyExtractor={(item) => item.id}
-          style={styles.medicationList}
-        />
-        <View style={styles.labelContainer}>
-          <Text style={styles.label}>Data Final:</Text>
-          <TouchableOpacity
-            style={styles.dateButton}
-            onPress={() => setIsDatePickerVisible(true)}
-          >
-            <Text style={styles.dateButtonText}>Escolher Data Final</Text>
-          </TouchableOpacity>
-        </View>
-        <DateTimePickerModal
-          isVisible={isDatePickerVisible}
-          mode="date"
-          onConfirm={handleConfirmDate}
-          onCancel={() => setIsDatePickerVisible(false)}
-          date={finalDate}
-          display="spinner"
-          textColor="black" // Força a cor do texto
-        />
-        <View style={styles.labelContainer}>
-          <Text style={styles.label}>Hora Inicial:</Text>
-          <TouchableOpacity
-            style={styles.timeButton}
-            onPress={() => setIsTimePickerVisible(true)}
-          >
-            <Text style={styles.timeButtonText}>Escolher Hora Inicial</Text>
-          </TouchableOpacity>
-        </View>
-        <DateTimePickerModal
-          isVisible={isTimePickerVisible}
-          mode="time"
-          onConfirm={handleConfirmTime}
-          onCancel={() => setIsTimePickerVisible(false)}
-          date={startTime}
-          display="spinner"
-          textColor="black" // Força a cor do texto
-        />
-        <View style={styles.labelContainer}>
-          <Text style={styles.label}>Intervalo em horas:</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Intervalo em horas"
-            keyboardType="numeric"
-            value={intervalHours}
-            onChangeText={setIntervalHours}
+      <KeyboardAwareScrollView
+        contentContainerStyle={styles.scrollContainer}
+        extraHeight={150}
+        enableOnAndroid={true}
+      >
+        <View style={styles.modalView}>
+          <Text style={styles.modalTitle}>Adicionar Lembrete de Medicamento</Text>
+          <FlatList
+            data={medications}
+            renderItem={renderMedicationCard}
+            keyExtractor={(item) => item.id}
+            style={styles.medicationList}
           />
+          <View style={styles.labelContainer}>
+            <Text style={styles.label}>Data Final:</Text>
+            <TouchableOpacity
+              style={styles.dateButton}
+              onPress={() => setIsDatePickerVisible(true)}
+            >
+              <Text style={styles.dateButtonText}>Escolher Data Final</Text>
+            </TouchableOpacity>
+            {finalDate && (
+              <Text style={styles.selectedDateText}>
+                Data selecionada: {finalDate.toLocaleDateString("pt-BR")}
+              </Text>
+            )}
+          </View>
+
+          <DateTimePickerModal
+            isVisible={isDatePickerVisible}
+            mode="date"
+            onConfirm={handleConfirmDate}
+            onCancel={() => setIsDatePickerVisible(false)}
+            date={finalDate}
+            display="spinner"
+            textColor="black"
+          />
+
+          <View style={styles.labelContainer}>
+            <Text style={styles.label}>Hora Inicial:</Text>
+            <TouchableOpacity
+              style={styles.timeButton}
+              onPress={() => setIsTimePickerVisible(true)}
+            >
+              <Text style={styles.timeButtonText}>Escolher Hora Inicial</Text>
+            </TouchableOpacity>
+            {startTime && (
+              <Text style={styles.selectedTimeText}>
+                Hora selecionada: {startTime.toLocaleTimeString("pt-BR", {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </Text>
+            )}
+          </View>
+
+          <DateTimePickerModal
+            isVisible={isTimePickerVisible}
+            mode="time"
+            onConfirm={handleConfirmTime}
+            onCancel={() => setIsTimePickerVisible(false)}
+            date={startTime}
+            display="spinner"
+            textColor="black"
+          />
+
+          <View style={styles.labelContainer}>
+            <Text style={styles.label}>Intervalo em horas:</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Intervalo em horas"
+              keyboardType="numeric"
+              value={intervalHours}
+              onChangeText={setIntervalHours}
+              placeholderTextColor="black"
+            />
+          </View>
+
+          <TouchableOpacity style={styles.saveButton} onPress={calculateReminders}>
+            <Text style={styles.saveButtonText}>Salvar Lembrete</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <Text style={styles.closeButtonText}>Fechar</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.saveButton} onPress={calculateReminders}>
-          <Text style={styles.saveButtonText}>Salvar Lembrete</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-          <Text style={styles.closeButtonText}>Fechar</Text>
-        </TouchableOpacity>
-      </View>
+      </KeyboardAwareScrollView>
     </Modal>
   );
 };
 
 const styles = StyleSheet.create({
+  scrollContainer: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingVertical: 50,
+  },
   modalView: {
     margin: 20,
     backgroundColor: "white",
@@ -307,7 +323,7 @@ const styles = StyleSheet.create({
   },
   medicationList: {
     width: "100%",
-    maxHeight: 300, // Limita a altura da lista
+    maxHeight: 300,
   },
   medicationCard: {
     backgroundColor: "#f0f0f0",
@@ -340,15 +356,6 @@ const styles = StyleSheet.create({
   },
   medicationDetails: {
     fontSize: 14,
-  },
-  medicationFooter: {
-    flexDirection: "row",
-    justifyContent: "flex-start",
-    alignItems: "center",
-    marginTop: 5,
-  },
-  medicationIcon: {
-    marginLeft: 10,
   },
   dateButton: {
     backgroundColor: "#007bff",
@@ -417,16 +424,17 @@ const styles = StyleSheet.create({
   selectedCard: {
     backgroundColor: "#cce5ff",
   },
-  deleteButton: {
-    backgroundColor: "#dc3545",
-    padding: 8,
-    borderRadius: 10,
-    marginTop: 10,
-    alignItems: "center",
-  },
-  deleteButtonText: {
-    color: "white",
+  selectedDateText: {
+    color: "#333",
     fontSize: 14,
+    marginTop: 5,
+    fontWeight: "bold",
+  },
+  selectedTimeText: {
+    color: "#333",
+    fontSize: 14,
+    marginTop: 5,
+    fontWeight: "bold",
   },
 });
 
