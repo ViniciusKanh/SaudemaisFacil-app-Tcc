@@ -62,6 +62,7 @@
     "react-native-keyboard-aware-scroll-view": "^0.9.5",
     "react-native-markdown-display": "^7.0.2",
     "react-native-modal-datetime-picker": "^17.1.0",
+    "react-native-paper": "^5.12.5",
     "react-native-pdf": "^6.7.5",
     "react-native-picker-select": "^9.2.0",
     "react-native-push-notification": "^8.1.1",
@@ -70,8 +71,9 @@
     "react-native-screens": "3.31.1",
     "react-native-svg": "15.2.0",
     "react-native-tab-view": "^3.5.2",
-    "react-native-vector-icons": "^10.1.0",
+    "react-native-vector-icons": "^10.2.0",
     "saudemaisfacil": "file:",
+    "styled-components": "^6.1.13",
     "xlsx": "^0.18.5",
     "yet": "^0.1.0"
   },

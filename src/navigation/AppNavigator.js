@@ -8,6 +8,7 @@ import {
   Modal,
   Button,
   FlatList,
+  ScrollView
 } from "react-native";
 import { getAuth, signOut } from "firebase/auth";
 import { getStorage, ref, getDownloadURL } from "firebase/storage";
@@ -39,8 +40,10 @@ import {
   onSnapshot,
   getDocs,
   doc,
+  getDoc,
   updateDoc,
 } from "firebase/firestore";
+import { Card } from 'react-native-paper';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -49,7 +52,7 @@ export default function AppNavigator() {
   const [modalVisible, setModalVisible] = useState(false);
   const [userProfileImageUrl, setUserProfileImageUrl] = useState("");
   const [isLembretesModalVisible, setLembretesModalVisible] = useState(false);
-  const [isMedLembretesModalVisible, setMedLembretesModalVisible] = useState(false); // Modal para medicamentos
+  const [isMedLembretesModalVisible, setMedLembretesModalVisible] = useState(false);
   const [lembretesPendentesConsultas, setLembretesPendentesConsultas] = useState([]);
   const [lembretesPendentesMedicamentos, setLembretesPendentesMedicamentos] = useState([]);
   const [pendingConsultationCount, setPendingConsultationCount] = useState(0);
@@ -58,7 +61,18 @@ export default function AppNavigator() {
   const storage = getStorage();
   const navigation = useNavigation();
 
+const handleMarkAsTaken = async (reminder) => {
+  try {
+    await updateDoc(doc(db, "remindersMedication", reminder.id), { status: "Tomado" });
+    fetchMedicationReminders(); // Atualiza a lista de lembretes após marcar como "Tomado"
+  } catch (error) {
+    console.error("Erro ao atualizar o status do lembrete: ", error);
+  }
+};
+
+
   useEffect(() => {
+    
     if (auth.currentUser) {
       const userImageRef = ref(
         storage,
@@ -96,6 +110,7 @@ export default function AppNavigator() {
       const reminders = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
+        
       }));
       setLembretesPendentesConsultas(reminders);
       setPendingConsultationCount(reminders.length);
@@ -104,35 +119,112 @@ export default function AppNavigator() {
     }
   };
 
-  // Função para buscar lembretes de medicamentos
-// Função para buscar lembretes de medicamentos
-const fetchMedicationReminders = async () => {
-  const user = auth.currentUser;
-  if (!user) return;
 
-  const remindersRef = collection(db, "remindersMedication");
-  const q = query(
-    remindersRef,
-    where("userId", "==", user.uid),
-    where("status", "==", "Pendente") // Verifica por string "Pendente"
-  );
-  try {
-    const querySnapshot = await getDocs(q);
-    const reminders = querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    }));
-    setLembretesPendentesMedicamentos(reminders);
-    setPendingMedicationCount(reminders.length);
-  } catch (error) {
-    console.error("Erro ao buscar lembretes de medicamentos:", error);
-  }
-};
+  const fetchMedicationReminders = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    const remindersRef = collection(db, "remindersMedication");
+    const q = query(
+      remindersRef,
+      where("userId", "==", user.uid),
+      where("status", "==", "Pendente")
+    );
+    
+    try {
+      const querySnapshot = await getDocs(q);
+      const reminders = [];
+    
+      for (const docSnapshot of querySnapshot.docs) {
+        const data = docSnapshot.data();
+    
+        // Verifica se o campo `medicationId` existe e busca as informações do medicamento correspondente
+        const medicationRef = doc(db, "medications", data.medicationId);
+        const medicationSnapshot = await getDoc(medicationRef);
+        
+        // Verifica se o documento do medicamento existe
+        const medicationData = medicationSnapshot.exists() ? medicationSnapshot.data() : {};
+    
+        // Mapeia as informações do medicamento e do lembrete
+        reminders.push({
+          id: docSnapshot.id,
+          medicationName: medicationData.name || "Nome não disponível",
+          dosage: medicationData.dosage || "Não informado",
+          medicationFormat: medicationData.form || "Formato não disponível", // Aqui está o formato
+          medicationImageUrl: medicationData.imageUrl || null,  // Verifica se a imagem do medicamento está disponível
+          formattedDate: new Date(data.reminderTime).toLocaleDateString('pt-BR'),
+          formattedTime: new Date(data.reminderTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          status: data.status || "Pendente",
+        });
+      }
+    
+      setLembretesPendentesMedicamentos(reminders);
+      setPendingMedicationCount(reminders.length);
+    } catch (error) {
+      console.error("Erro ao buscar lembretes de medicamentos:", error.message);
+    }
+  };
+  
 
-  useEffect(() => {
-    fetchConsultationReminders();
-    fetchMedicationReminders();
-  }, [auth.currentUser]);
+
+  const MedicationCard = ({ reminder }) => {
+    const [expanded, setExpanded] = useState(false);  // Controla o estado de expansão do botão
+  
+    return (
+      <TouchableOpacity onPress={() => setExpanded(!expanded)} style={styles.cardContainer}>
+        {/* Informações do medicamento que são sempre exibidas */}
+        <View style={styles.medicationInfoContainer}>
+          <Image source={{ uri: reminder.medicationImageUrl }} style={styles.medicationImage} />
+          <View style={styles.medicationDetailsContainer}>
+            <Text style={styles.cardTitle}>{reminder.medicationName || "Nome não disponível"}</Text>
+            <Text>Dosagem: {reminder.dosage || "Não informado"}</Text>
+            <Text>Data: {reminder.formattedDate || "Data não disponível"}</Text>
+            <Text>Hora: {reminder.formattedTime || "Hora não disponível"}</Text>
+          </View>
+        </View>
+  
+        {/* Exibe o botão "Marcar como Tomado" apenas quando o card for expandido */}
+        {expanded && (
+          <TouchableOpacity onPress={() => handleMarkAsTaken(reminder)} style={styles.takenButton}>
+            <Text style={styles.buttonText}>Marcar como Tomado</Text>
+          </TouchableOpacity>
+        )}
+      </TouchableOpacity>
+    );
+  };
+  
+  
+  <Modal
+  visible={isMedLembretesModalVisible}
+  animationType="slide"
+  transparent={true}
+  onRequestClose={() => setMedLembretesModalVisible(false)}
+>
+  <View style={styles.centeredView}>
+    <View style={styles.modalView}>
+      <ScrollView>
+        {lembretesPendentesMedicamentos.length > 0 ? (
+          lembretesPendentesMedicamentos.map((reminder) => (
+            <MedicationCard key={reminder.id} reminder={reminder} />
+          ))
+        ) : (
+          <Text>Nenhum lembrete de medicamento</Text>
+        )}
+      </ScrollView>
+      <Button title="Fechar" onPress={() => setMedLembretesModalVisible(false)} />
+    </View>
+  </View>
+</Modal>
+
+  
+
+
+
+useEffect(() => {
+  fetchConsultationReminders();
+  fetchMedicationReminders();
+}, [auth.currentUser]);
+
 
   // Modal para lembretes de consultas
   const handleLembretesClick = () => {
@@ -253,7 +345,6 @@ const fetchMedicationReminders = async () => {
         />
         <Tab.Screen name="ChatBot-IA" component={ChatbotScreen} />
         <Tab.Screen name="Duvidas" component={DoubtsScreen} />
-        <Tab.Screen name="Perfils" component={View} />
       </Tab.Navigator>
     );
   }
@@ -404,30 +495,32 @@ const fetchMedicationReminders = async () => {
         </View>
       </Modal>
 
-{/* Modal para lembretes de medicamentos */}
-<Modal
-  animationType="slide"
-  transparent={true}
-  visible={isMedLembretesModalVisible}
-  onRequestClose={() => setMedLembretesModalVisible(false)}
->
-  <View style={styles.centeredView}>
-    <View style={styles.modalView}>
-      <Text style={styles.modalTitle}>Lembretes de Medicamentos Pendentes</Text>
-      {lembretesPendentesMedicamentos.length === 0 ? (
-        <Text>Nenhum lembrete de medicamento pendente.</Text>
-      ) : (
-        <FlatList
-          data={lembretesPendentesMedicamentos}
-          renderItem={({ item }) => <RenderMedicationItem item={item} />}
-          keyExtractor={(item) => item.id.toString()}
-          style={styles.flatListStyle}
-        />
-      )}
-      <Button title="Fechar" onPress={() => setMedLembretesModalVisible(false)} />
-    </View>
-  </View>
-</Modal>
+    {/* Modal para lembretes de medicamentos */}
+    <Modal
+        visible={isMedLembretesModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setMedLembretesModalVisible(false)}
+      >
+        <View style={styles.centeredView}>
+          <View style={styles.modalView}>
+            <ScrollView>
+              {lembretesPendentesMedicamentos.length > 0 ? (
+                lembretesPendentesMedicamentos.map((reminder) => (
+                  <MedicationCard key={reminder.id} reminder={reminder} />
+                ))
+              ) : (
+                <Text>Nenhum lembrete de medicamento</Text>
+              )}
+            </ScrollView>
+            <Button title="Fechar" onPress={() => setMedLembretesModalVisible(false)} />
+          </View>
+        </View>
+      </Modal>
+
+
+
+
 
 
     </>
@@ -439,23 +532,24 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",  // Deixa o fundo escuro, mas com transparência
   },
   modalView: {
-    margin: 20,
+    width: "75%",  // Ajusta o tamanho do modal
+    maxHeight: "70%",  // Limita a altura
     backgroundColor: "white",
     borderRadius: 20,
-    padding: 35,
+    padding: 20,
     alignItems: "center",
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
-    width: "80%",
+  },
+  medicationInfoContainer: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   modalTitle: {
     marginBottom: 15,
@@ -492,32 +586,46 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     marginTop: 10,
   },
+  cardContainer: {
+    backgroundColor: '#fff',
+    padding: 10,
+    marginVertical: 10,
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+    width: '100%',  // Garante que o card ocupe toda a largura da tela
+  },
   medicationInfoContainer: {
     flexDirection: "row",
     alignItems: "center",
   },
   medicationImage: {
-    width: 50,
-    height: 50,
-    marginRight: 10,
+    width: 60,
+    height: 60,
     borderRadius: 10,
+    marginRight: 15,
   },
   medicationDetailsContainer: {
     flex: 1,
   },
-  listItemTitle: {
+  cardTitle: {
     fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  takenButton: {
+    backgroundColor: "#28a745",
+    padding: 12,
+    borderRadius: 5,
+    marginTop: 15,
+    alignItems: 'center',  // Centraliza o botão dentro do card
+  },
+  buttonText: {
+    color: "#fff",
     fontWeight: "bold",
-    color: "#007bff", // Azul para destaque
-  },
-  listItemDetail: {
-    fontSize: 16,
-    color: "#666", // Cinza para detalhes
-    marginTop: 5,
-  },
-  buttonContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    marginTop: 10,
-  },
+    textAlign: "center",
+  }
 });

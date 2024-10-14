@@ -7,9 +7,8 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
-  SectionList,
+  ScrollView,
   Image,
-  ScrollView
 } from "react-native";
 import { db } from "../../../config/firebaseConfig";
 import {
@@ -41,7 +40,7 @@ import {
 const RemindersMedicationViewScreen = () => {
   const [reminders, setReminders] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(true);  // Loader enquanto carrega
+  const [loading, setLoading] = useState(true); // Loader enquanto carrega
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentWeek, setCurrentWeek] = useState([]);
   const TOLERANCE_MINUTES = 30; // Tolerância em minutos
@@ -62,11 +61,11 @@ const RemindersMedicationViewScreen = () => {
   };
 
   const fetchReminders = async () => {
-    setLoading(true);  // Exibe o loader
+    setLoading(true); // Exibe o loader
     const user = getAuth().currentUser;
     if (!user) {
       console.log("Nenhum usuário autenticado.");
-      setLoading(false);  // Remove o loader
+      setLoading(false); // Remove o loader
       return;
     }
 
@@ -98,7 +97,7 @@ const RemindersMedicationViewScreen = () => {
       allReminders.push({
         id: docSnapshot.id,
         ...reminderData,
-        medicationData,
+        medicationData, // Adiciona os dados do medicamento relacionados
         formattedDate: reminderTime.format("DD/MM/YYYY"),
         formattedTime: reminderTime.format("HH:mm"),
         Status: status,
@@ -120,7 +119,7 @@ const RemindersMedicationViewScreen = () => {
       { title: "Tomados", data: completedReminders },
     ]);
 
-    setLoading(false);  // Remove o loader após carregar
+    setLoading(false); // Remove o loader após carregar
   };
 
   const onRefresh = () => {
