@@ -36,6 +36,9 @@ import {
   CremeIcon,
   SprayIcon,
 } from "../../Medicamento/FormsMedications"; // Importando os ícones
+import { useRoute } from "@react-navigation/native";
+import { useNavigation } from '@react-navigation/native';
+
 
 const RemindersMedicationViewScreen = () => {
   const [reminders, setReminders] = useState([]);
@@ -43,7 +46,10 @@ const RemindersMedicationViewScreen = () => {
   const [loading, setLoading] = useState(true); // Loader enquanto carrega
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentWeek, setCurrentWeek] = useState([]);
-  const TOLERANCE_MINUTES = 30; // Tolerância em minutos
+  const loaderSize = "large"; // Certifique-se de que o valor é válido
+  const route = useRoute();
+  const TOLERANCE_MINUTES = route.params?.tolerance || 30; // Recebe a tolerância ou usa 30 como padrão
+  const navigation = useNavigation(); // Obtém o objeto de navegação
 
   useEffect(() => {
     moment.locale('pt-br'); // Configura o moment.js para PT-BR
@@ -82,7 +88,7 @@ const RemindersMedicationViewScreen = () => {
       const reminderData = docSnapshot.data();
       const reminderTime = moment(reminderData.reminderTime);
       const timeDifference = moment().diff(reminderTime, 'minutes');
-      const isLate = timeDifference > TOLERANCE_MINUTES;
+      const isLate = timeDifference > TOLERANCE_MINUTES; // Usa a tolerância passada
 
       const status = isLate
         ? "Não Tomado"
@@ -135,6 +141,10 @@ const RemindersMedicationViewScreen = () => {
       console.error("Erro ao atualizar status do lembrete: ", error);
     }
   };
+
+  useEffect(() => {
+    navigation.setOptions({ title: `Tolerância: ${TOLERANCE_MINUTES} minutos` });
+  }, [navigation, TOLERANCE_MINUTES]);
 
   const handleDelete = async (id) => {
     try {
@@ -243,24 +253,31 @@ const RemindersMedicationViewScreen = () => {
       <View style={styles.monthYearHeader}>
         <Text style={styles.monthText}>{moment(selectedDate).format("MMMM YYYY")}</Text>
       </View>
+      <Text style={styles.toleranceText}>
+        Tolerância: {TOLERANCE_MINUTES} minutos
+      </Text>
       <View style={styles.weekSelector}>
-        <TouchableOpacity onPress={handlePreviousWeek} style={styles.arrowButton}>
-          <Icon name="chevron-left" size={24} color="#28a745" />
-        </TouchableOpacity>
-        <FlatList
-          horizontal
-          data={currentWeek}
-          renderItem={renderDateItem}
-          keyExtractor={(item) => item.toString()}
-          contentContainerStyle={styles.dateList}
-        />
-        <TouchableOpacity onPress={handleNextWeek} style={styles.arrowButton}>
-          <Icon name="chevron-right" size={24} color="#28a745" />
-        </TouchableOpacity>
-      </View>
+  <TouchableOpacity onPress={handlePreviousWeek} style={styles.arrowButton}>
+    <Icon name="chevron-left" size={24} color="#28a745" />
+  </TouchableOpacity>
+
+  <FlatList
+    data={currentWeek}
+    renderItem={renderDateItem}
+    keyExtractor={(item) => item.toString()}
+    horizontal // Torna a lista horizontal
+    showsHorizontalScrollIndicator={false} // Oculta a barra de rolagem
+    contentContainerStyle={styles.weekListContainer} // Adiciona um estilo para o container
+  />
+
+  <TouchableOpacity onPress={handleNextWeek} style={styles.arrowButton}>
+    <Icon name="chevron-right" size={24} color="#28a745" />
+  </TouchableOpacity>
+</View>
+
 
       {loading ? (
-        <ActivityIndicator size="large" color="#28a745" style={styles.loader} />
+        <ActivityIndicator size={loaderSize} color="#28a745" style={styles.loader} />
       ) : (
         <ScrollView
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
@@ -296,12 +313,6 @@ const styles = StyleSheet.create({
   monthText: {
     fontSize: 20,
     fontWeight: 'bold',
-  },
-  weekSelector: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 10,
   },
   dateList: {
     flexGrow: 1,
@@ -419,6 +430,53 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontWeight: "bold",
   },
+  toleranceText: {
+    fontSize: 18,
+    color: '#333',
+    textAlign: 'center',
+    marginVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  weekSelector: {
+    flexDirection: 'row', // Alinha os itens na horizontal
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    paddingHorizontal: 10,
+  },
+  
+  weekListContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+  },
+  
+  dateItem: {
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: '#e0e0e0',
+    marginHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 50, // Define largura mínima para os itens
+  },
+  
+  dateItemSelected: {
+    backgroundColor: '#28a745',
+  },
+  
+  dateText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  
+  dateTextSelected: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  
 });
 
 export default RemindersMedicationViewScreen;

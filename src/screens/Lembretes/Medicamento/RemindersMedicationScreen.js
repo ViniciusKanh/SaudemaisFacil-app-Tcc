@@ -15,7 +15,7 @@ import { collection, addDoc, getDocs, deleteDoc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import * as Notifications from 'expo-notifications';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view'; // Importante
+import { Picker } from '@react-native-picker/picker'; // Adicione o pacote correto
 
 import {
   CapsuleIcon,
@@ -32,13 +32,18 @@ const RemindersMedicationScreen = ({ isVisible, onClose }) => {
   const [medications, setMedications] = useState([]);
   const [selectedMedication, setSelectedMedication] = useState(null);
   const [finalDate, setFinalDate] = useState(new Date());
-  const [intervalHours, setIntervalHours] = useState("");
+  const [intervalHours, setIntervalHours] = useState(""); // Mantém como string para compatibilidade com o Picker
   const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
   const [isTimePickerVisible, setIsTimePickerVisible] = useState(false);
   const [startTime, setStartTime] = useState(new Date());
-
+  const [selectedInterval, setSelectedInterval] = useState("0.5"); // Valor inicial (30 minutos)
   const auth = getAuth();
   const user = auth.currentUser;
+
+  // Gera as opções do Picker (0.5 representa 30 minutos, 1 é 1 hora, até 23)
+  const intervalOptions = Array.from({ length: 23 }, (_, i) => (i + 1).toString());
+  const pickerOptions = ["0.5", ...intervalOptions];
+
 
   useEffect(() => {
     if (isVisible) {
@@ -67,6 +72,11 @@ const RemindersMedicationScreen = ({ isVisible, onClose }) => {
       }));
       setMedications(meds);
     }
+  };
+
+  const handleIntervalChange = (value) => {
+    setIntervalHours(value); // Atualiza o estado para compatibilidade com a lógica
+    setSelectedInterval(value); // Atualiza o estado selecionado
   };
 
   const handleConfirmDate = (date) => {
@@ -205,11 +215,6 @@ const RemindersMedicationScreen = ({ isVisible, onClose }) => {
 
   return (
     <Modal animationType="slide" transparent={true} visible={isVisible}>
-      <KeyboardAwareScrollView
-        contentContainerStyle={styles.scrollContainer}
-        extraHeight={150}
-        enableOnAndroid={true}
-      >
         <View style={styles.modalView}>
           <Text style={styles.modalTitle}>Adicionar Lembrete de Medicamento</Text>
           <FlatList
@@ -219,7 +224,7 @@ const RemindersMedicationScreen = ({ isVisible, onClose }) => {
             style={styles.medicationList}
           />
           <View style={styles.labelContainer}>
-            <Text style={styles.label}>Data Final:</Text>
+          
             <TouchableOpacity
               style={styles.dateButton}
               onPress={() => setIsDatePickerVisible(true)}
@@ -228,7 +233,7 @@ const RemindersMedicationScreen = ({ isVisible, onClose }) => {
             </TouchableOpacity>
             {finalDate && (
               <Text style={styles.selectedDateText}>
-                Data selecionada: {finalDate.toLocaleDateString("pt-BR")}
+                <Text style={styles.label}>Data Final:  {finalDate.toLocaleDateString("pt-BR")}</Text>
               </Text>
             )}
           </View>
@@ -244,7 +249,6 @@ const RemindersMedicationScreen = ({ isVisible, onClose }) => {
           />
 
           <View style={styles.labelContainer}>
-            <Text style={styles.label}>Hora Inicial:</Text>
             <TouchableOpacity
               style={styles.timeButton}
               onPress={() => setIsTimePickerVisible(true)}
@@ -252,12 +256,11 @@ const RemindersMedicationScreen = ({ isVisible, onClose }) => {
               <Text style={styles.timeButtonText}>Escolher Hora Inicial</Text>
             </TouchableOpacity>
             {startTime && (
-              <Text style={styles.selectedTimeText}>
-                Hora selecionada: {startTime.toLocaleTimeString("pt-BR", {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </Text>
+               <Text style={styles.label}>Hora Inicial: {startTime.toLocaleTimeString("pt-BR", {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}</Text>
+            
             )}
           </View>
 
@@ -271,16 +274,19 @@ const RemindersMedicationScreen = ({ isVisible, onClose }) => {
             textColor="black"
           />
 
-          <View style={styles.labelContainer}>
+        {/* Campo Intervalo como Picker */}
+        <View style={styles.labelContainer}>
             <Text style={styles.label}>Intervalo em horas:</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Intervalo em horas"
-              keyboardType="numeric"
-              value={intervalHours}
-              onChangeText={setIntervalHours}
-              placeholderTextColor="black"
-            />
+            <Picker
+              selectedValue={selectedInterval}
+              onValueChange={handleIntervalChange}
+              style={styles.picker}
+            >
+              <Picker.Item label="30 minutos" value="0.5" />
+              {pickerOptions.map((option) => (
+                <Picker.Item key={option} label={`${option} hora(s)`} value={option} />
+              ))}
+            </Picker>
           </View>
 
           <TouchableOpacity style={styles.saveButton} onPress={calculateReminders}>
@@ -290,7 +296,6 @@ const RemindersMedicationScreen = ({ isVisible, onClose }) => {
             <Text style={styles.closeButtonText}>Fechar</Text>
           </TouchableOpacity>
         </View>
-      </KeyboardAwareScrollView>
     </Modal>
   );
 };
@@ -436,6 +441,7 @@ const styles = StyleSheet.create({
     marginTop: 5,
     fontWeight: "bold",
   },
+
 });
 
 export default RemindersMedicationScreen;

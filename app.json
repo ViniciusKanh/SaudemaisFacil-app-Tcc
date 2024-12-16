@@ -17,14 +17,16 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.saudemaisfacil.app"
+      "bundleIdentifier": "com.saudemaisfacil.app",
+      "newArchEnabled": true
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.saudemaisfacil.app"
+      "package": "com.saudemaisfacil.app",
+      "newArchEnabled": true
     },
     "web": {
       "favicon": "./assets/favicon.png"

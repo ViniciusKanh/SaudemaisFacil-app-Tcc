@@ -275,8 +275,8 @@ useEffect(() => {
               case "Consultas":
                 iconName = focused ? "alarm" : "alarm-outline";
                 return <Ionicons name={iconName} size={size} color={color} />;
-              case "Medicamentos":
-                iconName = focused ? "medkit" : "medkit-outline";
+              case "Monitoramento":
+                iconName = focused ? "heart" : "heart-outline";
                 return <Ionicons name={iconName} size={size} color={color} />;
               case "Perfils":
                 return (
@@ -328,21 +328,7 @@ useEffect(() => {
             ),
           }}
         />
-         <Tab.Screen
-          name="Medicamentos"
-          component={LembretesScreen}
-          options={{
-            tabBarIcon: ({ focused, color, size }) => (
-              <Ionicons name={focused ? "medkit" : "medkit-outline"} size={size} color={color} />
-            ),
-            tabBarBadge: pendingMedicationCount > 0 ? pendingMedicationCount : undefined,
-            tabBarButton: (props) => (
-              <TouchableOpacity {...props} onPress={handleMedLembretesClick}>
-                {/* Abre o modal para lembretes de medicamentos */}
-              </TouchableOpacity>
-            ),
-          }}
-        />
+        <Tab.Screen name="Monitoramento" component={HistoricoPressao} />
         <Tab.Screen name="ChatBot-IA" component={ChatbotScreen} />
         <Tab.Screen name="Duvidas" component={DoubtsScreen} />
       </Tab.Navigator>
@@ -445,34 +431,39 @@ useEffect(() => {
   return (
     <>
       <Stack.Navigator
-        screenOptions={({ route }) => ({
-          headerStyle: {
-            backgroundColor: "#65BF85",
-            height: 150,
-          },
-          headerTintColor: "#fff",
-          headerTitleStyle: {
-            fontWeight: "bold",
-          },
-        })}
-      >
-        <Stack.Screen name="Auth" component={AuthNavigator} options={{ headerShown: false }} />
-        <Stack.Screen name="Menu" component={BottomTabNavigator} options={{ headerShown: false }} />
-        <Stack.Screen name="Dados Pessoais" component={PerfilScreen} />
-        <Stack.Screen name="Pressão / Diabetes" component={DCNTScreen} />
-        <Stack.Screen name="Receitas" component={MedicalPrescriptionScreen} />
-        <Stack.Screen name="Perfil" component={InformationSaudeScreen} />
-        <Stack.Screen name="Histórico" component={InfoSaudePGScreen} />
-        <Stack.Screen name="Lembretes" component={LembretesScreen} />
-        <Stack.Screen name="Medicamentos" component={MedicationScreen} />
-        <Stack.Screen name="ChatbotScreen" component={ChatbotScreen} />
-        <Stack.Screen name="Duvidas" component={DoubtsScreen} />
-        <Stack.Screen name="Historico Glicemia" component={HistoricoGlicemia} />
-        <Stack.Screen name="Historico Pressão Arterial" component={HistoricoPressao} />
-        <Stack.Screen name="Consultas" component={RelRemindersConsultationScreen} />
-        <Stack.Screen name="Informações Saúde" component={DadosSaudeSaudeScreen} />
-        <Stack.Screen name="Lembrete Medicamento" component={RelRemindersMedicamentotionScreen} />
-      </Stack.Navigator>
+  screenOptions={{
+    headerStyle: {
+      backgroundColor: "#65BF85",
+      height: 150,
+    },
+    headerTintColor: "#fff",
+    headerTitleStyle: {
+      fontWeight: "bold",
+    },
+  }}
+>
+  <Stack.Screen name="Auth" component={AuthNavigator} options={{ headerShown: false }} />
+  <Stack.Screen name="Menu" component={BottomTabNavigator} options={{ headerShown: false }} />
+  <Stack.Screen name="Dados Pessoais" component={PerfilScreen} />
+  <Stack.Screen name="Pressão / Diabetes" component={DCNTScreen} />
+  <Stack.Screen name="Receitas" component={MedicalPrescriptionScreen} />
+  <Stack.Screen name="Perfil" component={InformationSaudeScreen} />
+  <Stack.Screen name="Histórico" component={InfoSaudePGScreen} />
+  <Stack.Screen name="Lembretes" component={LembretesScreen} />
+  <Stack.Screen name="Medicamentos" component={MedicationScreen} />
+  <Stack.Screen name="ChatbotScreen" component={ChatbotScreen} />
+  <Stack.Screen name="Duvidas" component={DoubtsScreen} />
+  <Stack.Screen name="Historico Glicemia" component={HistoricoGlicemia} />
+  <Stack.Screen name="Historico Pressão Arterial" component={HistoricoPressao} />
+  <Stack.Screen name="Consultas" component={RelRemindersConsultationScreen} />
+  <Stack.Screen name="Informações Saúde" component={DadosSaudeSaudeScreen} />
+  <Stack.Screen
+  name="RemindersMedicationView"
+  component={RelRemindersMedicamentotionScreen} // Confirme que está importado corretamente
+  options={{ title: "Visualizar Medicamentos" }}
+/>
+
+</Stack.Navigator>
 
       {/* Modal para lembretes de consultas */}
       <Modal
