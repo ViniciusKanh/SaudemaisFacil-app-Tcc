@@ -1,3 +1,4 @@
+//RelRemindersMedicationScreen.js
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -38,6 +39,7 @@ import {
 } from "../../Medicamento/FormsMedications"; // Importando os ícones
 import { useRoute } from "@react-navigation/native";
 import { useNavigation } from '@react-navigation/native';
+import DateTimePickerModal from "react-native-modal-datetime-picker";
 
 
 const RemindersMedicationViewScreen = () => {
@@ -50,96 +52,138 @@ const RemindersMedicationViewScreen = () => {
   const route = useRoute();
   const TOLERANCE_MINUTES = route.params?.tolerance || 30; // Recebe a tolerância ou usa 30 como padrão
   const navigation = useNavigation(); // Obtém o objeto de navegação
-
+  const [showAllPendings, setShowAllPendings] = useState(false);
+  const [isTimePickerVisible, setIsTimePickerVisible] = useState(false);
+  const [selectedReminder, setSelectedReminder] = useState(null);
+  const user = getAuth().currentUser;
   useEffect(() => {
-    moment.locale('pt-br'); // Configura o moment.js para PT-BR
+    moment.locale('pt-br');
     generateWeekDates(selectedDate);
-    fetchReminders();
   }, [selectedDate]);
 
-  const generateWeekDates = (selectedDate) => {
-    const startOfWeek = moment(selectedDate).startOf("week").toDate();
-    const weekDates = [];
-    for (let i = 0; i < 7; i++) {
-      weekDates.push(moment(startOfWeek).add(i, "days").toDate());
-    }
+  useEffect(() => {
+    fetchReminders();
+    //console.log("📌 Data selecionada:", moment(selectedDate).format("YYYY-MM-DD"));
+   // console.log("✅ Lembretes a serem exibidos:", reminders);
+  }, [selectedDate]);
+  
+
+  const generateWeekDates = (date) => {
+    const startOfWeek = moment(date).startOf("week").toDate();
+    const weekDates = Array.from({ length: 7 }, (_, i) =>
+      moment(startOfWeek).add(i, "days").toDate()
+    );
     setCurrentWeek(weekDates);
   };
 
   const fetchReminders = async () => {
-    setLoading(true); // Exibe o loader
-    const user = getAuth().currentUser;
+    setLoading(true);
+  
     if (!user) {
       console.log("Nenhum usuário autenticado.");
-      setLoading(false); // Remove o loader
+      setLoading(false);
       return;
     }
-
-    const remindersQuery = query(
-      collection(db, "remindersMedication"),
-      where("userId", "==", user.uid),
-      orderBy("reminderTime", "asc")
-    );
-
-    const querySnapshot = await getDocs(remindersQuery);
-    const allReminders = [];
-
-    for (const docSnapshot of querySnapshot.docs) {
-      const reminderData = docSnapshot.data();
-      const reminderTime = moment(reminderData.reminderTime);
-      const timeDifference = moment().diff(reminderTime, 'minutes');
-      const isLate = timeDifference > TOLERANCE_MINUTES; // Usa a tolerância passada
-
-      const status = isLate
-        ? "Não Tomado"
-        : reminderData.status === "Tomado"
-        ? "Tomado"
-        : "Pendente";
-
-      const medicationDocRef = doc(db, "medications", reminderData.medicationId);
-      const medicationDoc = await getDoc(medicationDocRef);
-      const medicationData = medicationDoc.exists() ? medicationDoc.data() : {};
-
-      allReminders.push({
+  
+    try {
+      let remindersQuery = query(
+        collection(db, "remindersMedication"),
+        where("userId", "==", user.uid),
+        orderBy("reminderTime", "asc")
+      );
+  
+      const querySnapshot = await getDocs(remindersQuery);
+      const allReminders = querySnapshot.docs.map((docSnapshot) => ({
         id: docSnapshot.id,
-        ...reminderData,
-        medicationData, // Adiciona os dados do medicamento relacionados
-        formattedDate: reminderTime.format("DD/MM/YYYY"),
-        formattedTime: reminderTime.format("HH:mm"),
-        Status: status,
+        ...docSnapshot.data(),
+        formattedDate: moment(docSnapshot.data().reminderTime).format("YYYY-MM-DD"),
+        formattedTime: moment(docSnapshot.data().reminderTime).format("HH:mm"),
+      }));
+  
+     // console.log("📌 Todos os lembretes carregados:", allReminders);
+  
+      // Buscar os dados do medicamento associado a cada lembrete
+      const medicationIds = [...new Set(allReminders.map(r => r.medicationId))];
+      const medicationDocs = await Promise.all(medicationIds.map(id => getDoc(doc(db, "medications", id))));
+  
+      const medicationsMap = {};
+      medicationDocs.forEach(doc => {
+        if (doc.exists()) medicationsMap[doc.id] = doc.data();
       });
+  
+      // Associar os medicamentos aos lembretes
+      const remindersWithMedications = allReminders.map(reminder => ({
+        ...reminder,
+        medicationData: medicationsMap[reminder.medicationId] || {},
+      }));
+  
+   //   console.log("📌 Lembretes com informações do medicamento:", remindersWithMedications);
+  
+      // Filtrar apenas os lembretes para a data selecionada
+      const selectedDateString = moment(selectedDate).format("YYYY-MM-DD");
+    //  console.log("📅 Data selecionada no FlatList:", selectedDateString);
+  
+      const filteredReminders = remindersWithMedications.filter(reminder => {
+     //   console.log(`🔍 Comparando: ${reminder.formattedDate} === ${selectedDateString}`);
+        return reminder.formattedDate === selectedDateString;
+      });
+  
+   //   console.log("✅ Lembretes filtrados para a data selecionada:", filteredReminders);
+  
+      // Categorizar os lembretes corretamente
+      const groupedReminders = {
+        "Pendentes": filteredReminders.filter(r => r.status === "Pendente"),
+        "Não Tomados": filteredReminders.filter(r => r.status === "Não Tomado"),
+        "Tomados": filteredReminders.filter(r => r.status === "Tomado"),
+      };
+  
+   //   console.log("📌 Lembretes organizados por status:", groupedReminders);
+  
+      setReminders(groupedReminders);
+    } catch (error) {
+      console.error("❌ Erro ao buscar lembretes:", error);
+      setReminders({ "Pendentes": [], "Não Tomados": [], "Tomados": [] });
     }
-
-    const filteredReminders = allReminders.filter(
-      (reminder) => moment(reminder.reminderTime).isSame(selectedDate, "day")
-    );
-
-    // Separar lembretes por status: Pendentes, Não Tomados e Tomados
-    const pendingReminders = filteredReminders.filter(reminder => reminder.Status === "Pendente");
-    const notTakenReminders = filteredReminders.filter(reminder => reminder.Status === "Não Tomado");
-    const completedReminders = filteredReminders.filter(reminder => reminder.Status === "Tomado");
-
-    setReminders([
-      { title: "Pendentes", data: pendingReminders },
-      { title: "Não Tomados", data: notTakenReminders },
-      { title: "Tomados", data: completedReminders },
-    ]);
-
-    setLoading(false); // Remove o loader após carregar
+  
+    setLoading(false);
   };
-
+  
+  
+  
   const onRefresh = () => {
     setRefreshing(true);
     fetchReminders().finally(() => setRefreshing(false));
   };
 
-  const handleMarkAsTaken = async (reminder) => {
+  const handleMarkAsTaken = (reminder) => {
+    setSelectedReminder(reminder);
+    setIsTimePickerVisible(true);
+  };
+  
+  const handleConfirmTime = async (time) => {
+    if (!selectedReminder) return;
+  
+    const selectedDateTime = moment(time).toISOString(); // Salvar data e hora exata da ingestão
+  
     try {
-      await updateDoc(doc(db, "remindersMedication", reminder.id), { status: "Tomado" });
-      fetchReminders(); // Atualiza automaticamente após a ação
+      await updateDoc(doc(db, "remindersMedication", selectedReminder.id), {
+        status: "Tomado",
+        horarioTomado: selectedDateTime, // Atualiza a data e hora real no banco
+      });
+  
+      fetchReminders(); // Atualiza os lembretes após a alteração
     } catch (error) {
-      console.error("Erro ao atualizar status do lembrete: ", error);
+      console.error("Erro ao atualizar status do lembrete:", error);
     }
+  
+    setIsTimePickerVisible(false);
+    setSelectedReminder(null);
+  };
+  
+
+
+  const toggleShowAllPendings = () => {
+    setShowAllPendings((prev) => !prev);
   };
 
   useEffect(() => {
@@ -171,82 +215,111 @@ const RemindersMedicationViewScreen = () => {
 
   const renderDateItem = ({ item }) => {
     const isSelected = moment(item).isSame(selectedDate, "day");
+ //   console.log("📅 Renderizando Data na FlatList:", moment(item).format("YYYY-MM-DD"), "Selecionado:", isSelected);
+  
     return (
       <TouchableOpacity
         style={[styles.dateItem, isSelected && styles.dateItemSelected]}
-        onPress={() => setSelectedDate(item)}
+        onPress={() => {
+    //      console.log("🔄 Mudando data selecionada para:", moment(item).format("YYYY-MM-DD"));
+          setSelectedDate(item);
+        }}
       >
-        <Text style={[styles.dateText, isSelected && styles.dateTextSelected]}>{moment(item).format("D")}</Text>
-        <Text style={[styles.dayText, isSelected && styles.dateTextSelected]}>{moment(item).format("ddd").toUpperCase()}</Text>
+        <Text style={[styles.dateText, isSelected && styles.dateTextSelected]}>
+          {moment(item).format("D")}
+        </Text>
+        <Text style={[styles.dayText, isSelected && styles.dateTextSelected]}>
+          {moment(item).format("ddd").toUpperCase()}
+        </Text>
       </TouchableOpacity>
     );
   };
-
+  
+  
   const renderReminder = (item) => {
-    const isTaken = item.Status === "Tomado";
-    const isLate = item.Status === "Não Tomado";
+    const isTaken = item.status === "Tomado";
+    const isLate = item.status === "Não Tomado";
 
-    const MedicationIcon = item.medicationData?.form
-      ? {
-          Pill: PillIcon,
-          Capsule: CapsuleIcon,
-          Potinho: PoteIcon,
-          ComprimidoRetangular: ComprimidoRetangularIcon,
-          Injecao: InjecaoIcon,
-          Adesivo: AdesivoIcon,
-          Cream: CremeIcon,
-          Spray: SprayIcon,
-        }[item.medicationData.form]
-      : null;
+    const medicationData = item.medicationData || {};
+
+    const MedicationIcon = medicationData.form
+        ? {
+              Pill: PillIcon,
+              Capsule: CapsuleIcon,
+              Potinho: PoteIcon,
+              ComprimidoRetangular: ComprimidoRetangularIcon,
+              Injecao: InjecaoIcon,
+              Adesivo: AdesivoIcon,
+              Cream: CremeIcon,
+              Spray: SprayIcon,
+          }[medicationData.form]
+        : null;
+
+    // Converter horários para comparação
+    const scheduledTime = moment(`${item.formattedDate} ${item.formattedTime}`, "YYYY-MM-DD HH:mm");
+    const takenTime = item.horarioTomado ? moment(item.horarioTomado) : null;
+
+    let timeDifferenceText = "⏳ Não foi tomado";
+    let differenceMinutes = 0;
+
+    if (isTaken && takenTime) {
+        differenceMinutes = takenTime.diff(scheduledTime, "minutes");
+
+        if (differenceMinutes > 0) {
+            timeDifferenceText = `⏳ Atrasado ${differenceMinutes} min`;
+        } else if (differenceMinutes < 0) {
+            timeDifferenceText = `⏩ Adiantado ${Math.abs(differenceMinutes)} min`;
+        } else {
+            timeDifferenceText = "✅ Tomado no horário";
+        }
+    }
 
     return (
-      <View key={item.id} style={[styles.card, isTaken && styles.cardTaken, isLate && styles.cardLate]}>
-        <View style={styles.cardHeader}>
-          <View style={styles.cardDetails}>
-            {item.medicationData?.imageUrl ? (
-              <Image
-                source={{ uri: item.medicationData.imageUrl }}
-                style={styles.medicationImage}
-              />
-            ) : (
-              <View style={styles.placeholderImage} />
-            )}
-            <View style={styles.medicationInfo}>
-              <Text style={styles.medicationName}>
-                {item.medicationData?.name || "Nome não disponível"}
-              </Text>
-              <Text style={styles.medicationDetails}>
-                Dosagem: {item.medicationData?.dosage || "N/A"}
-              </Text>
-              <Text style={styles.medicationDetails}>
-                Tipo: {item.medicationData?.type || "N/A"}
-              </Text>
+        <View key={item.id} style={[styles.card, isTaken && styles.cardTaken, isLate && styles.cardLate]}>
+            <View style={styles.cardHeader}>
+                <View style={styles.cardDetails}>
+                    {medicationData.imageUrl ? (
+                        <Image source={{ uri: medicationData.imageUrl }} style={styles.medicationImage} />
+                    ) : (
+                        <View style={styles.placeholderImage} />
+                    )}
+
+                    <View style={styles.medicationInfo}>
+                        <Text style={styles.medicationName}>{medicationData.name || "Nome não disponível"}</Text>
+                        <Text style={styles.medicationDetails}>Dosagem: {medicationData.dosage || "N/A"}</Text>
+                        <Text style={styles.medicationDetails}>Tipo: {medicationData.type || "N/A"}</Text>
+                        <Text style={styles.medicationDetails}>Forma: {medicationData.form || "N/A"}</Text>
+                        <Text style={styles.medicationDetails}>Observações: {medicationData.observations || "Nenhuma"}</Text>
+                    </View>
+
+                    {MedicationIcon && <MedicationIcon color={medicationData.color || "#000"} size={50} style={styles.medicationIcon} />}
+                </View>
+
+                <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.trashIcon}>
+                    <Icon name="trash" size={24} color="red" />
+                </TouchableOpacity>
             </View>
-            {MedicationIcon && (
-              <MedicationIcon
-                color={item.medicationData?.color || "#000"}
-                size={50}
-                style={styles.medicationIcon}
-              />
-            )}
-          </View>
-          <TouchableOpacity onPress={() => handleDelete(item.id)} style={styles.trashIcon}>
-            <Icon name="trash" size={24} color="red" />
-          </TouchableOpacity>
+
+            <View style={styles.cardFooter}>
+                <Text style={styles.reminderTime}>Programado: {item.formattedDate} às {item.formattedTime}</Text>
+
+                {isTaken ? (
+                    <View>
+                        <Text style={styles.takenTime}>Tomado às {takenTime.format("DD/MM/YYYY HH:mm")}</Text>
+                        <Text style={[styles.timeDifference, differenceMinutes > 0 ? styles.lateText : styles.earlyText]}>
+                            {timeDifferenceText}
+                        </Text>
+                    </View>
+                ) : (
+                    <TouchableOpacity onPress={() => handleMarkAsTaken(item)} style={styles.takenButton}>
+                        <Text style={styles.buttonText}>Medicamento Tomado</Text>
+                    </TouchableOpacity>
+                )}
+            </View>
         </View>
-        <View style={styles.cardFooter}>
-          <Text style={styles.reminderTime}>
-            {item.formattedDate} às {item.formattedTime}
-          </Text>
-          {!isTaken && (
-            <TouchableOpacity onPress={() => handleMarkAsTaken(item)} style={styles.takenButton}>
-              <Text style={styles.buttonText}>Medicamento Tomado</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
     );
-  };
+};
+
 
   return (
     <View style={styles.container}>
@@ -270,6 +343,15 @@ const RemindersMedicationViewScreen = () => {
     contentContainerStyle={styles.weekListContainer} // Adiciona um estilo para o container
   />
 
+<DateTimePickerModal
+  isVisible={isTimePickerVisible}
+  mode="time"
+  onConfirm={handleConfirmTime} // Função que salva o horário escolhido
+  onCancel={() => setIsTimePickerVisible(false)}
+  display="spinner"
+/>
+
+
   <TouchableOpacity onPress={handleNextWeek} style={styles.arrowButton}>
     <Icon name="chevron-right" size={24} color="#28a745" />
   </TouchableOpacity>
@@ -279,20 +361,17 @@ const RemindersMedicationViewScreen = () => {
       {loading ? (
         <ActivityIndicator size={loaderSize} color="#28a745" style={styles.loader} />
       ) : (
-        <ScrollView
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        >
-          {reminders.map((section, index) => (
-            <View key={index} style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>{section.title}</Text>
-              {section.data.length > 0 ? (
-                section.data.map((item) => renderReminder(item))
-              ) : (
-                <Text style={styles.noRemindersText}>Nenhum lembrete encontrado.</Text>
-              )}
+        <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+        {Object.keys(reminders).map((status) => (
+          reminders[status].length > 0 ? (
+            <View key={status} style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>{status}</Text>
+              {reminders[status].map((item) => renderReminder(item))}
             </View>
-          ))}
-        </ScrollView>
+          ) : null
+        ))}
+      </ScrollView>
+      
       )}
     </View>
   );
