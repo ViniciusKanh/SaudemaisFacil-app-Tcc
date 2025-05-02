@@ -31,14 +31,14 @@ const PressaoArterialScreen = ({ isModalVisible, closeModal }) => {
   const auth = getAuth();
   const user = auth.currentUser;
   const [humorItems, setHumorItems] = useState([]);
-  const [humorSelecionado, setHumorSelecionado] = useState({});
+  const [humorSelecionado, setHumorSelecionado] = useState(null);
 
   useEffect(() => {
     const fetchHumores = async () => {
       try {
         const querySnapshot = await getDocs(collection(db, "humors"));
         const fetchedHumores = querySnapshot.docs.map((doc) => ({
-          label: doc.data().humores, // Confirme se este é o campo correto
+          label: doc.data().humores, // 👈 Corrigido conforme Firebase
           value: doc.id,
         }));
         setHumores(fetchedHumores);
@@ -48,30 +48,29 @@ const PressaoArterialScreen = ({ isModalVisible, closeModal }) => {
         Alert.alert("Erro", "Não foi possível buscar os humores.");
       }
     };
-
+  
     fetchHumores();
   }, []);
+  
 
   const handleSalvarPressao = async () => {
-    // Verificação de usuário movida para dentro desta função
     if (!user) {
-      Alert.alert(
-        "Usuário não logado",
-        "Você precisa estar logado para salvar a pressão arterial."
-      );
+      Alert.alert("Usuário não logado", "Você precisa estar logado para salvar a pressão arterial.");
       return;
     }
-
+  
     if (!sistolica || !diastolica) {
       Alert.alert("Erro", "Por favor, insira os valores de pressão arterial.");
       return;
     }
-
+  
+    const selectedHumorObject = humores.find((h) => h.value === humorSelecionado);
+  
     try {
       await addDoc(collection(db, "pressaoArterial"), {
         Sistolica: sistolica,
         Diastolica: diastolica,
-        Humor: humorSelecionado.label, // Salva o label do humor, não o ID
+        Humor: selectedHumorObject ? selectedHumorObject.label : "Não informado",
         Tontura: tontura,
         UsuarioID: user.uid,
         DataHora: serverTimestamp(),
@@ -79,22 +78,15 @@ const PressaoArterialScreen = ({ isModalVisible, closeModal }) => {
       Alert.alert("Sucesso", "Pressão arterial salva com sucesso!");
       closeModal();
     } catch (error) {
-      console.error("Erro ao salvar os dados de pressão arterial: ", error);
-      Alert.alert(
-        "Erro",
-        "Não foi possível salvar os dados de pressão arterial."
-      );
+      console.error("Erro ao salvar os dados:", error);
+      Alert.alert("Erro", "Não foi possível salvar os dados.");
     }
   };
+  
 
   return (
-    <Modal
-      animationType="slide"
-      transparent={true} // Isso permite que o fundo do modal seja transparente
-      visible={isModalVisible}
-      onRequestClose={closeModal}
-    >
-      <View style={styles.centeredView}>
+    <View style={styles.centeredView}>
+    <View style={styles.modalView}>
         <View style={styles.modalView}>
           <Text style={styles.tituloModal}>Registro de Pressão Arterial</Text>
           <Text>Pressão Alta (SYS):</Text>
@@ -116,15 +108,25 @@ const PressaoArterialScreen = ({ isModalVisible, closeModal }) => {
             onChangeText={setDiastolica}
           />
           <Text>Humor:</Text>
-          <RNPickerSelect
-            onValueChange={(value) => {
-              const selectedHumor = humores.find((h) => h.value === value);
-              setHumorSelecionado(selectedHumor || {});
-            }}
-            items={humores}
-            placeholder={{ label: "Selecione um humor...", value: null }}
-            style={pickerSelectStyles}
-          />
+          <View style={styles.pickerContainer}>
+  <Picker
+    selectedValue={humorSelecionado}
+    onValueChange={(itemValue, itemIndex) => setHumorSelecionado(itemValue)}
+    style={styles.pickerInterno}
+  >
+    <Picker.Item label="Selecione um humor..." value={null} />
+    {humores.map((humor) => (
+      <Picker.Item
+        key={humor.value}
+        label={humor.label}
+        value={humor.value}
+      />
+    ))}
+  </Picker>
+</View>
+
+
+
 
           <View style={styles.switchContainer}>
             <Text style={styles.switchLabel}>Tontura ou dor de cabeça? </Text>
@@ -142,7 +144,7 @@ const PressaoArterialScreen = ({ isModalVisible, closeModal }) => {
           </TouchableOpacity>
         </View>
       </View>
-    </Modal>
+      </View>
   );
 };
 
@@ -183,23 +185,22 @@ const styles = StyleSheet.create({
     textAlign: "center", // Centralizar texto
   },
   modalView: {
-    margin: 20,
     backgroundColor: "white",
     borderRadius: 20,
-    padding: 35,
+    padding: 30,
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 2,
-      marginHorizontal: 15,
     },
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
-    width: "80%", // Ajuste de acordo com a largura desejada
-    maxWidth: 400, // Para tablets e dispositivos maiores
+    width: "96%",         // ✅ Mais largo em telas menores
+    maxWidth: 600,        // ✅ Limite em tablets e desktops
   },
+  
   input: {
     height: 48, // Tamanho maior para fácil interação
     marginVertical: 12,
@@ -283,6 +284,21 @@ const styles = StyleSheet.create({
     fontSize: 18, // Tamanho da fonte
     textAlign: "center", // Centralizar texto
   },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: "#ffffff",
+    borderRadius: 8,
+    height: 48,
+    justifyContent: "center",
+    marginVertical: 12,
+    width: "100%",
+    overflow: 'hidden',
+  },
+  pickerInterno: {
+    width: "100%",
+    color: "#ffffff",
+  },
+  
 });
 
 export default PressaoArterialScreen;

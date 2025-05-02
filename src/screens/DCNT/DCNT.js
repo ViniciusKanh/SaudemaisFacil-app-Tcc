@@ -125,9 +125,11 @@ const DCNTScreen = ({ navigation }) => {
           visible={isPressaoArterialModalVisible}
           onRequestClose={() => setPressaoArterialModalVisible(false)}
         >
-          <PressaoArterialScreen
-            closeModal={() => setPressaoArterialModalVisible(false)}
-          />
+<PressaoArterialScreen
+  isModalVisible={isPressaoArterialModalVisible}
+  closeModal={() => setPressaoArterialModalVisible(false)}
+/>
+
         </Modal>
 
         <Modal

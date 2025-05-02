@@ -511,7 +511,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.6)",
   },
   modalView: {
-    margin: 20,
+    margin: 1,
     justifyContent: "space-around", // Garante um espaçamento uniforme entre os itens
     backgroundColor: "white",
     borderRadius: 25,
@@ -522,8 +522,8 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 5,
     width: "90%",
-    height: "70%",
-    marginTop: -80,
+    height: "80%",
+    marginTop: 10,
   },
   closeButton: {
     alignSelf: "flex-end",

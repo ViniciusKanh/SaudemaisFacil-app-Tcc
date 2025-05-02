@@ -11,7 +11,7 @@ import {
   Modal,
   TouchableOpacity,
 } from "react-native";
-import RNPickerSelect from "react-native-picker-select";
+import { Picker } from "@react-native-picker/picker";
 import { db } from "../../config/firebaseConfig";
 import {
   collection,
@@ -27,7 +27,7 @@ const GlicemiaScreen = ({ closeModal }) => {
   const [inJejum, setInJejum] = useState(false);
   const [humor, setHumor] = useState("");
   const [humores, setHumores] = useState([]);
-  const [humorSelecionado, setHumorSelecionado] = useState({});
+  const [humorSelecionado, setHumorSelecionado] = useState("");
 
   const auth = getAuth();
   const user = auth.currentUser;
@@ -37,7 +37,7 @@ const GlicemiaScreen = ({ closeModal }) => {
       try {
         const querySnapshot = await getDocs(collection(db, "humors"));
         const fetchedHumores = querySnapshot.docs.map((doc) => ({
-          label: doc.data().humores, // Confirme se este é o campo correto
+          label: doc.data().humores, // 👈 Corrigido conforme Firebase
           value: doc.id,
         }));
         setHumores(fetchedHumores);
@@ -47,31 +47,30 @@ const GlicemiaScreen = ({ closeModal }) => {
         Alert.alert("Erro", "Não foi possível buscar os humores.");
       }
     };
-
+  
     fetchHumores();
   }, []);
 
   const handleSalvarGlicemia = async () => {
     if (!user) {
-      Alert.alert(
-        "Usuário não logado",
-        "Você precisa estar logado para salvar a glicemia."
-      );
+      Alert.alert("Usuário não logado", "Você precisa estar logado para salvar a glicemia.");
       return;
     }
-
+  
     if (!glicemia) {
       Alert.alert("Erro", "Por favor, insira o valor da glicemia.");
       return;
     }
-
+  
+    const selectedHumorObject = humores.find((h) => h.value === humorSelecionado);
+  
     try {
       await addDoc(collection(db, "diabetes"), {
         Glicemia: glicemia,
         Infasting: inJejum,
         ID_user: user.uid,
         Datetime: serverTimestamp(),
-        Humor: humorSelecionado.label,
+        Humor: selectedHumorObject ? selectedHumorObject.label : "Não informado",
       });
       Alert.alert("Sucesso", "Glicemia salva com sucesso!");
       closeModal();
@@ -80,11 +79,11 @@ const GlicemiaScreen = ({ closeModal }) => {
       Alert.alert("Erro", "Não foi possível salvar os dados de glicemia.");
     }
   };
+  
 
   return (
-    <Modal animationType="slide" transparent={true} onRequestClose={closeModal}>
-      <View style={styles.centeredView}>
-        <View style={styles.modalView}>
+    <View style={styles.centeredView}>
+    <View style={styles.modalView}>
           <Text style={styles.modalTitle}>Registro de Glicemia</Text>
           <Text>Glicemia (mg/dL)</Text>
           <TextInput
@@ -100,15 +99,21 @@ const GlicemiaScreen = ({ closeModal }) => {
             <Switch value={inJejum} onValueChange={setInJejum} />
           </View>
           <Text>Humor:</Text>
-          <RNPickerSelect
-            onValueChange={(value) => {
-              const selectedHumor = humores.find((h) => h.value === value);
-              setHumorSelecionado(selectedHumor || {});
-            }}
-            items={humores}
-            placeholder={{ label: "Selecione um humor...", value: null }}
-            style={pickerSelectStyles}
-          />
+<View style={styles.pickerContainer}>
+  <Picker
+    selectedValue={humorSelecionado}
+    onValueChange={(itemValue) => setHumorSelecionado(itemValue)}
+    style={styles.pickerInterno}
+  >
+    <Picker.Item label="Selecione um humor..." value="" />
+    {humores.map((humor) => (
+      <Picker.Item key={humor.value} label={humor.label} value={humor.value} />
+    ))}
+  </Picker>
+</View>
+
+
+
           <TouchableOpacity
             style={styles.buttonSalvar}
             onPress={handleSalvarGlicemia}
@@ -120,7 +125,7 @@ const GlicemiaScreen = ({ closeModal }) => {
           </TouchableOpacity>
         </View>
       </View>
-    </Modal>
+
   );
 };
 
@@ -133,22 +138,20 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.4)", // Fundo escuro translúcido
   },
   modalView: {
-    margin: 20,
     backgroundColor: "white",
     borderRadius: 20,
-    padding: 35,
+    padding: 30,
     alignItems: "center",
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 2,
-      marginHorizontal: 15,
     },
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
-    width: "80%", // Ajuste de acordo com a largura desejada
-    maxWidth: 400, // Para tablets e dispositivos maiores
+    width: "80%",         // ✅ Mais largo em telas menores
+    maxWidth: 600,        // ✅ Limite em tablets e desktops
   },
   modalTitle: {
     fontWeight: "bold", // Negrito
@@ -206,6 +209,20 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontSize: 18,
   },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    height: 48,
+    justifyContent: "center",
+    marginVertical: 12,
+    width: "100%",
+    overflow: "hidden",
+  },
+  pickerInterno: {
+    width: "100%",
+    color: "#000", // <- Corrigido: estava branco ("#ffffff") e sumia em fundo claro
+  },
 });
 
 // Estilos para o RNPickerSelect
@@ -231,6 +248,22 @@ const pickerSelectStyles = StyleSheet.create({
     color: "black",
     paddingRight: 30,
   },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    height: 48,
+    justifyContent: "center",
+    marginVertical: 12,
+    width: "100%",
+    overflow: "hidden",
+  },
+  pickerInterno: {
+    width: "100%",
+    color: "#000", // <- Corrigido: estava branco ("#ffffff") e sumia em fundo claro
+  },
+  
+  
 });
 
 export default GlicemiaScreen;

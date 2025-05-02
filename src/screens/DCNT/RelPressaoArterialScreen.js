@@ -244,12 +244,7 @@ const RelPressaoArterialScreen = ({ closeModal }) => {
         </ScrollView>
 
         <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={[styles.button, styles.exportButton]}
-            onPress={exportToPDF}
-          >
-            <Text style={styles.buttonText}>Exportar para PDF</Text>
-          </TouchableOpacity>
+          
 
           <TouchableOpacity
             style={[styles.button, styles.closeButton]}

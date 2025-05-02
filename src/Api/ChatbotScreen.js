@@ -11,36 +11,61 @@ const ChatbotScreen = () => {
   const [latestMessage, setLatestMessage] = useState(null);
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [currentPromptId, setCurrentPromptId] = useState(null);
 
   useEffect(() => {
-    const q = query(collection(db, "generate"), where("response", "!=", null), orderBy("createTime", "desc"), limit(1));
+    const q = query(
+      collection(db, "generate"),
+      orderBy("createTime", "desc"),
+      limit(5) // Pegamos mais de um para garantir o match
+    );
+  
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const data = querySnapshot.docs.map(doc => ({
+      const docs = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
-      if (data.length > 0) {
-        setLatestMessage(data[0]);
+  
+      const matchedDoc = docs.find(doc => doc.id === currentPromptId);
+  
+      if (matchedDoc) {
+        if (matchedDoc.response) {
+          setLatestMessage(matchedDoc);
+          setIsGenerating(false);
+        } else if (matchedDoc.status?.error) {
+          Alert.alert("Erro ao gerar resposta", matchedDoc.status.error);
+          setIsGenerating(false);
+        }
       }
     });
-
+  
     return () => unsubscribe();
-  }, []);
+  }, [currentPromptId]);
+  
+  
 
   const sendPrompt = async () => {
     if (input.trim() === '') return;
+  
     setLoading(true);
+    setIsGenerating(true);
+  
     try {
-      await addDoc(collection(db, "generate"), {
+      const docRef = await addDoc(collection(db, "generate"), {
         prompt: input,
         createTime: new Date()
       });
+      setCurrentPromptId(docRef.id);
+      
       setInput('');
     } catch (error) {
       Alert.alert('Erro', 'Não foi possível enviar a pergunta.');
     }
+  
     setLoading(false);
   };
+  
 
   const toggleCollapse = () => {
     setIsCollapsed(!isCollapsed);
@@ -79,6 +104,16 @@ const ChatbotScreen = () => {
         <TouchableOpacity style={styles.button} onPress={sendPrompt} disabled={loading}>
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Enviar</Text>}
         </TouchableOpacity>
+        {isGenerating && (
+  <View style={{ marginTop: 20, alignItems: 'center' }}>
+    <ActivityIndicator size="large" color="#2e7d32" />
+    <Text style={{ fontSize: 16, marginTop: 8, color: '#2e7d32' }}>
+      Gerando resposta...
+    </Text>
+  </View>
+)}
+
+
         {latestMessage && (
           <View style={styles.responseContainer}>
             <ScrollView style={styles.responseContainer}>
